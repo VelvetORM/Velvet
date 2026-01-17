@@ -1,0 +1,64 @@
+{
+  "name": "@velvet/core",
+  "version": "0.1.0",
+  "description": "Core ORM functionality for Velvet - The elegant TypeScript ORM",
+  "keywords": [
+    "orm",
+    "typescript",
+    "active-record",
+    "sql",
+    "query-builder"
+  ],
+  "homepage": "https://github.com/velvetorm/velvet/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/velvetorm/velvet/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/velvetorm/velvet.git",
+    "directory": "packages/core"
+  },
+  "license": "MIT",
+  "author": "Velvet ORM Team",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "knex": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@vitest/coverage-v8": "^1.2.1",
+    "better-sqlite3": "^9.3.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
