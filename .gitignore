@@ -39,6 +39,8 @@ pnpm-debug.log*
 tmp/
 temp/
 *.tmp
+tmpclaude-*
+VELVET_ORM_IMPLEMENTATION_SPEC.md
 
 # Database
 *.sqlite
