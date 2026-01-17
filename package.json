@@ -1,0 +1,70 @@
+{
+  "name": "velvet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The elegant TypeScript ORM with full type safety and intuitive Active Record pattern",
+  "keywords": [
+    "orm",
+    "typescript",
+    "active-record",
+    "sql",
+    "query-builder",
+    "database",
+    "postgres",
+    "mysql",
+    "sqlite",
+    "type-safe",
+    "nodejs"
+  ],
+  "homepage": "https://github.com/velvetorm/velvet#readme",
+  "bugs": {
+    "url": "https://github.com/velvetorm/velvet/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/velvetorm/velvet.git"
+  },
+  "license": "MIT",
+  "author": "Velvet ORM Team",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "pnpm --filter \"@velvet/*\" build",
+    "dev": "pnpm --filter \"@velvet/core\" dev",
+    "test": "pnpm --filter \"@velvet/*\" test",
+    "test:watch": "pnpm --filter \"@velvet/*\" test:watch",
+    "test:coverage": "pnpm --filter \"@velvet/*\" test:coverage",
+    "typecheck": "pnpm --filter \"@velvet/*\" typecheck",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\"",
+    "clean": "pnpm --filter \"@velvet/*\" clean && rm -rf node_modules",
+    "clean:dist": "pnpm --filter \"@velvet/*\" exec rm -rf dist",
+    "prepublishOnly": "pnpm build && pnpm test",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "pnpm": {
+    "overrides": {
+      "semver": "^7.5.4"
+    }
+  }
+}
