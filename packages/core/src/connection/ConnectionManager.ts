@@ -5,7 +5,7 @@
  * Supports connection pooling and automatic driver selection based on configuration.
  */
 
-import type { DatabaseConfig, DatabaseClient } from '../types'
+import type { DatabaseConfig } from '../types'
 import type { DriverContract } from '../drivers/contracts/DriverContract'
 import { SqliteDriver } from '../drivers/sqlite/SqliteDriver'
 import { ConnectionException } from '../exceptions'

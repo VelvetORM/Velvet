@@ -12,8 +12,7 @@ import type {
   WhereClause,
   JoinClause,
   OrderByClause,
-  PaginatedResult,
-  JoinType
+  PaginatedResult
 } from './types'
 import { Database } from './Database'
 import { SqliteGrammar } from './query/grammar/SqliteGrammar'

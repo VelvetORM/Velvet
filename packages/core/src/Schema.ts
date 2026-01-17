@@ -5,9 +5,9 @@
  * Used for migrations and schema management.
  */
 
-import { Database } from './Database'
-import type { ColumnDefinition, TableOptions } from './types'
-import { QuerySanitizer } from './support/QuerySanitizer'
+import { Database } from "./Database";
+import type { ColumnDefinition } from "./types";
+import { QuerySanitizer } from "./support/QuerySanitizer";
 
 /**
  * Column Definition Builder
@@ -15,65 +15,65 @@ import { QuerySanitizer } from './support/QuerySanitizer'
  * Fluent interface for defining table columns
  */
 class ColumnBuilder {
-  private definition: Partial<ColumnDefinition>
+  private definition: Partial<ColumnDefinition>;
 
   constructor(name: string, type: string) {
-    this.definition = { name, type } as any
+    this.definition = { name, type } as any;
   }
 
   /**
    * Make column nullable
    */
   nullable(): this {
-    this.definition.nullable = true
-    return this
+    this.definition.nullable = true;
+    return this;
   }
 
   /**
    * Set default value
    */
   default(value: any): this {
-    this.definition.default = value
-    return this
+    this.definition.default = value;
+    return this;
   }
 
   /**
    * Make column unsigned (numbers only)
    */
   unsigned(): this {
-    this.definition.unsigned = true
-    return this
+    this.definition.unsigned = true;
+    return this;
   }
 
   /**
    * Make column primary key
    */
   primary(): this {
-    this.definition.primary = true
-    return this
+    this.definition.primary = true;
+    return this;
   }
 
   /**
    * Make column unique
    */
   unique(): this {
-    this.definition.unique = true
-    return this
+    this.definition.unique = true;
+    return this;
   }
 
   /**
    * Auto increment (integers only)
    */
   autoIncrement(): this {
-    this.definition.autoIncrement = true
-    return this
+    this.definition.autoIncrement = true;
+    return this;
   }
 
   /**
    * Get the column definition
    */
   getDefinition(): Partial<ColumnDefinition> {
-    return this.definition
+    return this.definition;
   }
 }
 
@@ -86,20 +86,20 @@ export class Blueprint {
   /**
    * Table name
    */
-  public tableName: string
+  public tableName: string;
 
   /**
    * Column definitions
    */
-  public columns: Partial<ColumnDefinition>[] = []
+  public columns: Partial<ColumnDefinition>[] = [];
 
   /**
    * SQL commands to execute
    */
-  public commands: string[] = []
+  public commands: string[] = [];
 
   constructor(tableName: string) {
-    this.tableName = tableName
+    this.tableName = tableName;
   }
 
   // ==========================================
@@ -109,142 +109,146 @@ export class Blueprint {
   /**
    * Add an auto-incrementing integer primary key
    */
-  increments(name: string = 'id'): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'integer')
+  increments(name: string = "id"): ColumnBuilder {
+    const column = new ColumnBuilder(name, "integer")
       .primary()
       .autoIncrement()
-      .unsigned()
+      .unsigned();
 
-    this.columns.push(column.getDefinition())
-    return column
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a string column
    */
   string(name: string, length: number = 255): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'string')
-    column.getDefinition().length = length
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "string");
+    column.getDefinition().length = length;
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a text column
    */
   text(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'text')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "text");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add an integer column
    */
   integer(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'integer')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "integer");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a big integer column
    */
   bigInteger(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'bigInteger')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "bigInteger");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a float column
    */
   float(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'float')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "float");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a double column
    */
   double(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'double')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "double");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a decimal column
    */
-  decimal(name: string, precision: number = 8, scale: number = 2): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'decimal')
-    column.getDefinition().length = precision
-    column.getDefinition().scale = scale
-    this.columns.push(column.getDefinition())
-    return column
+  decimal(
+    name: string,
+    precision: number = 8,
+    scale: number = 2
+  ): ColumnBuilder {
+    const column = new ColumnBuilder(name, "decimal");
+    column.getDefinition().length = precision;
+    column.getDefinition().scale = scale;
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a boolean column
    */
   boolean(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'boolean')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "boolean");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a date column
    */
   date(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'date')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "date");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a datetime column
    */
   datetime(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'datetime')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "datetime");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a timestamp column
    */
   timestamp(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'timestamp')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "timestamp");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add created_at and updated_at timestamp columns
    */
   timestamps(): void {
-    this.timestamp('created_at').nullable()
-    this.timestamp('updated_at').nullable()
+    this.timestamp("created_at").nullable();
+    this.timestamp("updated_at").nullable();
   }
 
   /**
    * Add a JSON column
    */
   json(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'json')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "json");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   /**
    * Add a UUID column
    */
   uuid(name: string): ColumnBuilder {
-    const column = new ColumnBuilder(name, 'uuid')
-    this.columns.push(column.getDefinition())
-    return column
+    const column = new ColumnBuilder(name, "uuid");
+    this.columns.push(column.getDefinition());
+    return column;
   }
 
   // ==========================================
@@ -259,79 +263,79 @@ export class Blueprint {
    */
   toSql(): string {
     // Sanitize table name
-    const safeTableName = QuerySanitizer.sanitizeTableName(this.tableName)
+    const safeTableName = QuerySanitizer.sanitizeTableName(this.tableName);
 
     const columnDefinitions = this.columns.map((col) => {
       // Sanitize column name
-      const safeColumnName = QuerySanitizer.sanitizeColumnName(col.name!)
-      let sql = `"${safeColumnName}" `
+      const safeColumnName = QuerySanitizer.sanitizeColumnName(col.name!);
+      let sql = `"${safeColumnName}" `;
 
       // Map types to SQLite types
       switch (col.type) {
-        case 'integer':
-        case 'bigInteger':
-          sql += 'INTEGER'
-          break
-        case 'string':
-          sql += col.length ? `VARCHAR(${col.length})` : 'VARCHAR(255)'
-          break
-        case 'text':
-          sql += 'TEXT'
-          break
-        case 'float':
-        case 'double':
-        case 'decimal':
-          sql += 'REAL'
-          break
-        case 'boolean':
-          sql += 'INTEGER' // SQLite uses 0/1 for booleans
-          break
-        case 'date':
-        case 'datetime':
-        case 'timestamp':
-          sql += 'TEXT' // SQLite stores dates as TEXT
-          break
-        case 'json':
-          sql += 'TEXT'
-          break
-        case 'uuid':
-          sql += 'TEXT'
-          break
+        case "integer":
+        case "bigInteger":
+          sql += "INTEGER";
+          break;
+        case "string":
+          sql += col.length ? `VARCHAR(${col.length})` : "VARCHAR(255)";
+          break;
+        case "text":
+          sql += "TEXT";
+          break;
+        case "float":
+        case "double":
+        case "decimal":
+          sql += "REAL";
+          break;
+        case "boolean":
+          sql += "INTEGER"; // SQLite uses 0/1 for booleans
+          break;
+        case "date":
+        case "datetime":
+        case "timestamp":
+          sql += "TEXT"; // SQLite stores dates as TEXT
+          break;
+        case "json":
+          sql += "TEXT";
+          break;
+        case "uuid":
+          sql += "TEXT";
+          break;
         default:
-          sql += 'TEXT'
+          sql += "TEXT";
       }
 
       // Add modifiers
       if (col.primary) {
-        sql += ' PRIMARY KEY'
+        sql += " PRIMARY KEY";
       }
 
       if (col.autoIncrement) {
-        sql += ' AUTOINCREMENT'
+        sql += " AUTOINCREMENT";
       }
 
       if (!col.nullable && !col.primary) {
-        sql += ' NOT NULL'
+        sql += " NOT NULL";
       }
 
       if (col.unique && !col.primary) {
-        sql += ' UNIQUE'
+        sql += " UNIQUE";
       }
 
       if (col.default !== undefined) {
-        if (typeof col.default === 'string') {
-          sql += ` DEFAULT '${col.default}'`
+        if (typeof col.default === "string") {
+          sql += ` DEFAULT '${col.default}'`;
         } else if (col.default === null) {
-          sql += ' DEFAULT NULL'
+          sql += " DEFAULT NULL";
         } else {
-          sql += ` DEFAULT ${col.default}`
+          sql += ` DEFAULT ${col.default}`;
         }
       }
 
-      return sql
-    })
+      return sql;
+    });
 
-    return `CREATE TABLE "${safeTableName}" (\n  ${columnDefinitions.join(',\n  ')}\n)`
+    return `CREATE TABLE "${safeTableName}" (\n  ${columnDefinitions.join(",\n  ")}\n)`;
   }
 }
 
@@ -363,11 +367,11 @@ export class Schema {
     callback: (table: Blueprint) => void,
     connectionName?: string
   ): Promise<void> {
-    const blueprint = new Blueprint(tableName)
-    callback(blueprint)
+    const blueprint = new Blueprint(tableName);
+    callback(blueprint);
 
-    const sql = blueprint.toSql()
-    await Database.raw(sql, [], connectionName)
+    const sql = blueprint.toSql();
+    await Database.raw(sql, [], connectionName);
   }
 
   /**
@@ -377,8 +381,8 @@ export class Schema {
    * @param connectionName - Optional connection name
    */
   static async drop(tableName: string, connectionName?: string): Promise<void> {
-    const safeTableName = QuerySanitizer.sanitizeTableName(tableName)
-    await Database.raw(`DROP TABLE "${safeTableName}"`, [], connectionName)
+    const safeTableName = QuerySanitizer.sanitizeTableName(tableName);
+    await Database.raw(`DROP TABLE "${safeTableName}"`, [], connectionName);
   }
 
   /**
@@ -387,9 +391,16 @@ export class Schema {
    * @param tableName - Table name
    * @param connectionName - Optional connection name
    */
-  static async dropIfExists(tableName: string, connectionName?: string): Promise<void> {
-    const safeTableName = QuerySanitizer.sanitizeTableName(tableName)
-    await Database.raw(`DROP TABLE IF EXISTS "${safeTableName}"`, [], connectionName)
+  static async dropIfExists(
+    tableName: string,
+    connectionName?: string
+  ): Promise<void> {
+    const safeTableName = QuerySanitizer.sanitizeTableName(tableName);
+    await Database.raw(
+      `DROP TABLE IF EXISTS "${safeTableName}"`,
+      [],
+      connectionName
+    );
   }
 
   /**
@@ -399,17 +410,20 @@ export class Schema {
    * @param connectionName - Optional connection name
    * @returns True if table exists
    */
-  static async hasTable(tableName: string, connectionName?: string): Promise<boolean> {
+  static async hasTable(
+    tableName: string,
+    connectionName?: string
+  ): Promise<boolean> {
     // Sanitize table name (will be used in parameterized query, but still validate)
-    const safeTableName = QuerySanitizer.sanitizeTableName(tableName)
+    const safeTableName = QuerySanitizer.sanitizeTableName(tableName);
 
     const result = await Database.raw(
       `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
       [safeTableName],
       connectionName
-    )
+    );
 
-    return result.rows.length > 0
+    return result.rows.length > 0;
   }
 
   /**
@@ -426,15 +440,15 @@ export class Schema {
     connectionName?: string
   ): Promise<boolean> {
     // Sanitize identifiers before use
-    const safeTableName = QuerySanitizer.sanitizeTableName(tableName)
-    const safeColumnName = QuerySanitizer.sanitizeColumnName(columnName)
+    const safeTableName = QuerySanitizer.sanitizeTableName(tableName);
+    const safeColumnName = QuerySanitizer.sanitizeColumnName(columnName);
 
     const result = await Database.raw(
       `PRAGMA table_info("${safeTableName}")`,
       [],
       connectionName
-    )
+    );
 
-    return result.rows.some((row: any) => row.name === safeColumnName)
+    return result.rows.some((row: any) => row.name === safeColumnName);
   }
 }

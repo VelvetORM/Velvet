@@ -11,6 +11,8 @@ import type { ModelCasts, ModelAttributes, ModelEvent, Constructor } from './typ
 import { QuerySanitizer } from './support/QuerySanitizer'
 import { InputValidator, type ValidationRules } from './support/InputValidator'
 
+type ModelConstructor<T extends Model> = Constructor<T> & typeof Model
+
 /**
  * Base Model
  *
@@ -90,6 +92,12 @@ export abstract class Model {
   protected original: ModelAttributes = {}
 
   /**
+   * Dirty attributes tracking (changed keys)
+   * @protected
+   */
+  protected dirtyAttributes: Set<string> = new Set()
+
+  /**
    * Loaded relationships
    * @protected
    */
@@ -136,8 +144,8 @@ export abstract class Model {
    *
    * @param attributes - Initial attributes
    */
-  constructor(attributes: Partial<Model> = {}) {
-    this.fill(attributes)
+  constructor(attributes: Partial<ModelAttributes> = {}) {
+    this.fill(attributes as Partial<this>)
   }
 
   // ==========================================
@@ -149,7 +157,7 @@ export abstract class Model {
    *
    * @returns Query builder instance
    */
-  static query<T extends Model>(this: Constructor<T>): Builder<T> {
+  static query<T extends Model>(this: ModelConstructor<T>): Builder<T> {
     return new Builder<T>(this, (this as any).connection)
   }
 
@@ -157,7 +165,7 @@ export abstract class Model {
    * Add a basic WHERE clause
    */
   static where<T extends Model>(
-    this: Constructor<T>,
+    this: ModelConstructor<T>,
     column: string,
     operator?: any,
     value?: any
@@ -169,7 +177,7 @@ export abstract class Model {
    * Find a model by primary key
    */
   static async find<T extends Model>(
-    this: Constructor<T>,
+    this: ModelConstructor<T>,
     id: string | number
   ): Promise<T | null> {
     return this.query().find(id, (this as any).primaryKey)
@@ -181,7 +189,7 @@ export abstract class Model {
    * @throws {ModelNotFoundException} If not found
    */
   static async findOrFail<T extends Model>(
-    this: Constructor<T>,
+    this: ModelConstructor<T>,
     id: string | number
   ): Promise<T> {
     return this.query().findOrFail(id, (this as any).primaryKey)
@@ -190,21 +198,21 @@ export abstract class Model {
   /**
    * Get the first model
    */
-  static async first<T extends Model>(this: Constructor<T>): Promise<T | null> {
+  static async first<T extends Model>(this: ModelConstructor<T>): Promise<T | null> {
     return this.query().first()
   }
 
   /**
    * Get all models
    */
-  static async all<T extends Model>(this: Constructor<T>): Promise<T[]> {
+  static async all<T extends Model>(this: ModelConstructor<T>): Promise<T[]> {
     return this.query().get()
   }
 
   /**
    * Alias for all()
    */
-  static async get<T extends Model>(this: Constructor<T>): Promise<T[]> {
+  static async get<T extends Model>(this: ModelConstructor<T>): Promise<T[]> {
     return this.all()
   }
 
@@ -215,10 +223,10 @@ export abstract class Model {
    * @returns Created model instance
    */
   static async create<T extends Model>(
-    this: Constructor<T>,
+    this: ModelConstructor<T>,
     attributes: Partial<T>
   ): Promise<T> {
-    const instance = new this(attributes as any)
+    const instance = new (this as Constructor<T>)(attributes)
     await instance.save()
     return instance
   }
@@ -226,7 +234,7 @@ export abstract class Model {
   /**
    * Eager load relationships
    */
-  static with<T extends Model>(this: Constructor<T>, ...relations: string[]): Builder<T> {
+  static with<T extends Model>(this: ModelConstructor<T>, ...relations: string[]): Builder<T> {
     return this.query().with(...relations)
   }
 
@@ -234,7 +242,7 @@ export abstract class Model {
    * Add ORDER BY clause
    */
   static orderBy<T extends Model>(
-    this: Constructor<T>,
+    this: ModelConstructor<T>,
     column: string,
     direction?: 'asc' | 'desc'
   ): Builder<T> {
@@ -244,35 +252,35 @@ export abstract class Model {
   /**
    * Order by created_at DESC
    */
-  static latest<T extends Model>(this: Constructor<T>, column?: string): Builder<T> {
+  static latest<T extends Model>(this: ModelConstructor<T>, column?: string): Builder<T> {
     return this.query().latest(column)
   }
 
   /**
    * Order by created_at ASC
    */
-  static oldest<T extends Model>(this: Constructor<T>, column?: string): Builder<T> {
+  static oldest<T extends Model>(this: ModelConstructor<T>, column?: string): Builder<T> {
     return this.query().oldest(column)
   }
 
   /**
    * Limit results
    */
-  static limit<T extends Model>(this: Constructor<T>, value: number): Builder<T> {
+  static limit<T extends Model>(this: ModelConstructor<T>, value: number): Builder<T> {
     return this.query().limit(value)
   }
 
   /**
    * Alias for limit
    */
-  static take<T extends Model>(this: Constructor<T>, value: number): Builder<T> {
+  static take<T extends Model>(this: ModelConstructor<T>, value: number): Builder<T> {
     return this.limit(value)
   }
 
   /**
    * Get count of models
    */
-  static async count<T extends Model>(this: Constructor<T>): Promise<number> {
+  static async count<T extends Model>(this: ModelConstructor<T>): Promise<number> {
     return this.query().count()
   }
 
@@ -396,6 +404,13 @@ export abstract class Model {
     }
 
     this.attributes[key] = value
+
+    const originalValue = this.original[key]
+    if (!Object.is(value, originalValue)) {
+      this.dirtyAttributes.add(key)
+    } else {
+      this.dirtyAttributes.delete(key)
+    }
   }
 
   /**
@@ -575,10 +590,8 @@ export abstract class Model {
   protected getDirty(): Record<string, any> {
     const dirty: Record<string, any> = {}
 
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (JSON.stringify(value) !== JSON.stringify(this.original[key])) {
-        dirty[key] = value
-      }
+    for (const key of this.dirtyAttributes) {
+      dirty[key] = this.attributes[key]
     }
 
     return dirty
@@ -602,6 +615,7 @@ export abstract class Model {
    */
   protected syncOriginal(): void {
     this.original = { ...this.attributes }
+    this.dirtyAttributes.clear()
   }
 
   /**

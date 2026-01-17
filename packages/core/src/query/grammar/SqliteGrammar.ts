@@ -38,6 +38,15 @@ export class SqliteGrammar extends Grammar {
     offset?: number
     distinct?: boolean
   }): CompiledQuery {
+    let cacheKey: string | undefined
+    if (this.cachingEnabled) {
+      cacheKey = this.getCompilationCacheKey(components)
+      const cached = this.compilationCache.get(cacheKey)
+      if (cached) {
+        return this.cloneCompiledQuery(cached)
+      }
+    }
+
     const bindings: any[] = []
     const parts: string[] = []
 
@@ -78,10 +87,16 @@ export class SqliteGrammar extends Grammar {
       parts.push(`OFFSET ${validOffset}`)
     }
 
-    return {
+    const compiled = {
       sql: parts.join(' '),
       bindings
     }
+
+    if (cacheKey && this.cachingEnabled) {
+      this.compilationCache.set(cacheKey, this.cloneCompiledQuery(compiled))
+    }
+
+    return compiled
   }
 
   /**

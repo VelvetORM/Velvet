@@ -33,12 +33,52 @@ export abstract class Grammar {
   /**
    * Query compilation cache (LRU)
    */
-  protected compilationCache: LRUCache<string, string> = new LRUCache(500)
+  protected compilationCache: LRUCache<string, CompiledQuery> = new LRUCache(500)
 
   /**
    * Enable/disable query caching
    */
   protected cachingEnabled: boolean = true
+
+  /**
+   * Enable or disable query compilation caching
+   */
+  setCachingEnabled(enabled: boolean): this {
+    this.cachingEnabled = enabled
+    return this
+  }
+
+  /**
+   * Clear compiled query cache
+   */
+  clearCompilationCache(): void {
+    this.compilationCache.clear()
+  }
+
+  /**
+   * Get compiled query cache stats
+   */
+  getCompilationCacheStats(): { hits: number; misses: number; hitRate: number; size: number } {
+    return this.compilationCache.stats()
+  }
+
+  /**
+   * Build a stable cache key for compiled queries
+   */
+  protected getCompilationCacheKey(components: unknown): string {
+    return JSON.stringify({
+      grammar: this.constructor.name,
+      tablePrefix: this.tablePrefix,
+      components
+    })
+  }
+
+  /**
+   * Clone a compiled query to avoid mutating cached values
+   */
+  protected cloneCompiledQuery(query: CompiledQuery): CompiledQuery {
+    return { sql: query.sql, bindings: [...query.bindings] }
+  }
 
   /**
    * Compile a SELECT statement
@@ -232,7 +272,7 @@ export abstract class Grammar {
    * @param position - Parameter position (1-indexed)
    * @returns Placeholder string
    */
-  protected getParameterPlaceholder(position: number): string {
+  protected getParameterPlaceholder(_position: number): string {
     return this.parameterPlaceholder
   }
 
