@@ -5,7 +5,13 @@
  * This ensures consistent behavior across different database systems.
  */
 
-import type { RawQueryResult, DatabaseConfig, IsolationLevel } from '../../types'
+import type {
+  RawQueryResult,
+  DatabaseConfig,
+  IsolationLevel,
+  DatabaseRow,
+  SqlBindings
+} from '../../types'
 
 /**
  * Driver Contract Interface
@@ -56,7 +62,10 @@ export interface DriverContract {
    * console.log(result.rows)
    * ```
    */
-  query(sql: string, bindings?: any[]): Promise<RawQueryResult>
+  query<TRow extends DatabaseRow = DatabaseRow>(
+    sql: string,
+    bindings?: SqlBindings
+  ): Promise<RawQueryResult<TRow>>
 
   /**
    * Execute a SELECT query
@@ -70,7 +79,10 @@ export interface DriverContract {
    * const users = await driver.select('SELECT * FROM users WHERE active = ?', [true])
    * ```
    */
-  select(sql: string, bindings?: any[]): Promise<any[]>
+  select<TRow extends DatabaseRow = DatabaseRow>(
+    sql: string,
+    bindings?: SqlBindings
+  ): Promise<TRow[]>
 
   /**
    * Execute an INSERT query
@@ -87,7 +99,7 @@ export interface DriverContract {
    * )
    * ```
    */
-  insert(sql: string, bindings?: any[]): Promise<number | string>
+  insert(sql: string, bindings?: SqlBindings): Promise<number | string | bigint>
 
   /**
    * Execute an UPDATE query
@@ -104,7 +116,7 @@ export interface DriverContract {
    * )
    * ```
    */
-  update(sql: string, bindings?: any[]): Promise<number>
+  update(sql: string, bindings?: SqlBindings): Promise<number>
 
   /**
    * Execute a DELETE query
@@ -118,7 +130,7 @@ export interface DriverContract {
    * const deleted = await driver.delete('DELETE FROM users WHERE id = ?', [1])
    * ```
    */
-  delete(sql: string, bindings?: any[]): Promise<number>
+  delete(sql: string, bindings?: SqlBindings): Promise<number>
 
   /**
    * Begin a database transaction

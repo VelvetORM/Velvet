@@ -8,7 +8,13 @@
 import Database from 'better-sqlite3'
 import type { Database as SQLiteDatabase, Statement } from 'better-sqlite3'
 import { Driver } from '../Driver'
-import type { RawQueryResult, SqliteConnectionConfig, IsolationLevel } from '../../types'
+import type {
+  RawQueryResult,
+  SqliteConnectionConfig,
+  IsolationLevel,
+  SqlBindings,
+  DatabaseRow
+} from '../../types'
 import { ConnectionException, QueryException } from '../../exceptions'
 
 /**
@@ -80,11 +86,12 @@ export class SqliteDriver extends Driver {
       if (this.config.debug) {
         console.log(`[Velvet] Connected to SQLite: ${filename}`)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
       throw new ConnectionException(
-        `Failed to connect to SQLite: ${error.message}`,
+        `Failed to connect to SQLite: ${message}`,
         'SQLITE_CONNECTION_FAILED',
-        { error: error.message }
+        { error: message }
       )
     }
   }
@@ -107,9 +114,10 @@ export class SqliteDriver extends Driver {
       if (this.config.debug) {
         console.log('[Velvet] Disconnected from SQLite')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
       throw new ConnectionException(
-        `Failed to disconnect from SQLite: ${error.message}`,
+        `Failed to disconnect from SQLite: ${message}`,
         'SQLITE_DISCONNECT_FAILED'
       )
     }
@@ -123,7 +131,10 @@ export class SqliteDriver extends Driver {
    * @returns Query result
    * @throws {QueryException} If query fails
    */
-  async query(sql: string, bindings: any[] = []): Promise<RawQueryResult> {
+  async query<TRow extends DatabaseRow = DatabaseRow>(
+    sql: string,
+    bindings: SqlBindings = []
+  ): Promise<RawQueryResult<TRow>> {
     this.ensureConnected()
     this.log(sql, bindings)
 
@@ -132,7 +143,7 @@ export class SqliteDriver extends Driver {
     }
 
     try {
-      const stmt: Statement = this.db.prepare(sql)
+      const stmt: Statement<TRow> = this.db.prepare<TRow>(sql)
 
       // Determine query type
       const queryType = this.getQueryType(sql)
@@ -148,7 +159,7 @@ export class SqliteDriver extends Driver {
         return {
           rows: [],
           rowCount: info.changes,
-          insertId: info.lastInsertRowid as number
+          insertId: info.lastInsertRowid
         }
       } else {
         // UPDATE, DELETE
@@ -158,13 +169,14 @@ export class SqliteDriver extends Driver {
           rowCount: info.changes
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
       throw new QueryException(
-        `SQLite query failed: ${error.message}`,
+        `SQLite query failed: ${message}`,
         sql,
         bindings,
         'SQLITE_QUERY_FAILED',
-        { error: error.message }
+        { error: message }
       )
     }
   }
@@ -203,9 +215,10 @@ export class SqliteDriver extends Driver {
           console.log('[Velvet] Transaction started')
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
       throw new QueryException(
-        `Failed to begin transaction: ${error.message}`,
+        `Failed to begin transaction: ${message}`,
         'BEGIN TRANSACTION',
         [],
         'TRANSACTION_BEGIN_FAILED'
@@ -251,9 +264,10 @@ export class SqliteDriver extends Driver {
           console.log('[Velvet] Transaction committed')
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
       throw new QueryException(
-        `Failed to commit transaction: ${error.message}`,
+        `Failed to commit transaction: ${message}`,
         'COMMIT',
         [],
         'TRANSACTION_COMMIT_FAILED'
@@ -299,9 +313,10 @@ export class SqliteDriver extends Driver {
           console.log('[Velvet] Transaction rolled back')
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
       throw new QueryException(
-        `Failed to rollback transaction: ${error.message}`,
+        `Failed to rollback transaction: ${message}`,
         'ROLLBACK',
         [],
         'TRANSACTION_ROLLBACK_FAILED'

@@ -4,7 +4,13 @@
  * Abstract base class providing common functionality for all database drivers.
  */
 
-import type { DatabaseConfig, IsolationLevel, RawQueryResult } from '../types'
+import type {
+  DatabaseConfig,
+  IsolationLevel,
+  RawQueryResult,
+  DatabaseRow,
+  SqlBindings
+} from '../types'
 import type { DriverContract } from './contracts/DriverContract'
 import { ConnectionException } from '../exceptions'
 
@@ -60,21 +66,27 @@ export abstract class Driver implements DriverContract {
    * Execute a raw SQL query
    * Must be implemented by specific drivers
    */
-  abstract query(sql: string, bindings?: any[]): Promise<RawQueryResult>
+  abstract query<TRow extends DatabaseRow = DatabaseRow>(
+    sql: string,
+    bindings?: SqlBindings
+  ): Promise<RawQueryResult<TRow>>
 
   /**
    * Execute a SELECT query
    */
-  async select(sql: string, bindings?: any[]): Promise<any[]> {
+  async select<TRow extends DatabaseRow = DatabaseRow>(
+    sql: string,
+    bindings?: SqlBindings
+  ): Promise<TRow[]> {
     this.ensureConnected()
-    const result = await this.query(sql, bindings)
+    const result = await this.query<TRow>(sql, bindings)
     return result.rows
   }
 
   /**
    * Execute an INSERT query
    */
-  async insert(sql: string, bindings?: any[]): Promise<number | string> {
+  async insert(sql: string, bindings?: SqlBindings): Promise<number | string | bigint> {
     this.ensureConnected()
     const result = await this.query(sql, bindings)
     return result.insertId || 0
@@ -83,7 +95,7 @@ export abstract class Driver implements DriverContract {
   /**
    * Execute an UPDATE query
    */
-  async update(sql: string, bindings?: any[]): Promise<number> {
+  async update(sql: string, bindings?: SqlBindings): Promise<number> {
     this.ensureConnected()
     const result = await this.query(sql, bindings)
     return result.rowCount || 0
@@ -92,7 +104,7 @@ export abstract class Driver implements DriverContract {
   /**
    * Execute a DELETE query
    */
-  async delete(sql: string, bindings?: any[]): Promise<number> {
+  async delete(sql: string, bindings?: SqlBindings): Promise<number> {
     this.ensureConnected()
     const result = await this.query(sql, bindings)
     return result.rowCount || 0
@@ -163,7 +175,7 @@ export abstract class Driver implements DriverContract {
    * @param sql - SQL query
    * @param bindings - Query bindings
    */
-  protected log(sql: string, bindings?: any[]): void {
+  protected log(sql: string, bindings?: SqlBindings): void {
     if (this.config.debug) {
       console.log('[Velvet Query]', sql)
       if (bindings && bindings.length > 0) {
