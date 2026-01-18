@@ -5,6 +5,7 @@
  * Inspired by Laravel's Query Builder but with TypeScript type safety.
  */
 
+import { Model } from './Model'
 import type { ModelClass } from './Model'
 import type {
   ComparisonOperator,
@@ -15,10 +16,14 @@ import type {
   PaginatedResult,
   DatabaseRow
 } from './types'
-import { Model } from './Model'
 import { Database } from './Database'
 import { GrammarFactory } from './query/grammar/GrammarFactory'
+import { Collection } from './support/Collection'
 import type { Grammar } from './query/grammar/Grammar'
+import { ModelHydrator } from './model/ModelHydrator'
+import { RelationLoader } from './model/RelationLoader'
+import { QueryCompiler } from './query/QueryCompiler'
+import type { BuilderContract } from './contracts/BuilderContract'
 
 type ModelAttributeKeys<T> = T extends Model<infer A>
   ? Extract<keyof A, string>
@@ -27,8 +32,6 @@ type ModelAttributeKeys<T> = T extends Model<infer A>
 type ModelAttributeValue<T, K extends string> = T extends Model<infer A>
   ? K extends keyof A ? A[K] : unknown
   : unknown
-
-type RelationTree = { [key: string]: RelationTree }
 
 type ModelLikeConstructor = ModelClass<Model>
 
@@ -46,7 +49,7 @@ type ModelLikeConstructor = ModelClass<Model>
  *   .get()
  * ```
  */
-export class Builder<T = unknown> {
+export class Builder<T = unknown> implements BuilderContract<T> {
   /**
    * Table name
    */
@@ -148,6 +151,27 @@ export class Builder<T = unknown> {
     if (this.model?.softDeletes) {
       this.softDeleteColumn = this.model.deletedAtColumn || 'deleted_at'
     }
+  }
+
+  /**
+   * Assign a model class for hydration
+   */
+  setModelClass(model: ModelLikeConstructor): this {
+    this.model = model
+    this.tableName = model.table || model.name.toLowerCase() + 's'
+
+    if (!this.connectionName) {
+      this.connectionName = model.connection
+      this.grammar = GrammarFactory.create(this.connectionName)
+    }
+
+    if (model.softDeletes) {
+      this.softDeleteColumn = model.deletedAtColumn || 'deleted_at'
+    } else {
+      this.softDeleteColumn = undefined
+    }
+
+    return this
   }
 
   // ==========================================
@@ -468,34 +492,30 @@ export class Builder<T = unknown> {
   /**
    * Execute query and get all results
    *
-   * @returns Array of results
+   * @returns Collection of results
    *
    * @example
    * ```typescript
    * const users = await builder.get()
+   * users.pluck('name') // Collection<string>
+   * users.where('active', true) // Collection<User>
    * ```
    */
-  async get(): Promise<T[]> {
+  async get(): Promise<Collection<T>> {
     const { sql, bindings } = this.toSql()
     const rows = await Database.select<DatabaseRow>(sql, bindings, this.connectionName)
 
     if (this.model) {
-      const models = rows.map((row) => this.hydrate(row))
+      const hydrator = new ModelHydrator<T>(this.model)
+      const models = rows.map((row) => hydrator.hydrate(row))
       if (this.eagerLoad.length > 0) {
-        const modelItems: Model[] = []
-        for (const item of models) {
-          if (item instanceof Model) {
-            modelItems.push(item)
-          }
-        }
-        if (modelItems.length > 0) {
-          await Builder.eagerLoadRelations(modelItems, this.eagerLoad)
-        }
+        const modelItems = models.filter((item) => item instanceof Model) as Model[]
+        await RelationLoader.load(modelItems, this.eagerLoad)
       }
-      return models
+      return new Collection(models)
     }
 
-    return rows as T[]
+    return new Collection(rows as T[])
   }
 
   /**
@@ -506,7 +526,7 @@ export class Builder<T = unknown> {
   async first(): Promise<T | null> {
     this.limit(1)
     const results = await this.get()
-    return results[0] || null
+    return results.first() || null
   }
 
   /**
@@ -565,7 +585,8 @@ export class Builder<T = unknown> {
     const total = await this.count()
     const offset = (page - 1) * perPage
 
-    const data = await this.offset(offset).limit(perPage).get()
+    const results = await this.offset(offset).limit(perPage).get()
+    const data = results.toArray()
 
     return {
       data,
@@ -575,7 +596,7 @@ export class Builder<T = unknown> {
         currentPage: page,
         lastPage: Math.ceil(total / perPage),
         from: offset + 1,
-        to: offset + data.length
+        to: data.length
       }
     }
   }
@@ -665,135 +686,32 @@ export class Builder<T = unknown> {
    * @returns Compiled SQL and bindings
    */
   toSql(): { sql: string; bindings: unknown[] } {
-    const wheres = [...this.wheres]
-
-    if (this.softDeleteColumn) {
-      if (this.onlyTrashedFlag) {
-        wheres.push({
-          type: 'null',
-          column: this.softDeleteColumn,
-          boolean: 'AND',
-          not: true
-        })
-      } else if (!this.includeTrashed) {
-        wheres.push({
-          type: 'null',
-          column: this.softDeleteColumn,
-          boolean: 'AND'
-        })
+    const compiler = new QueryCompiler(this.grammar)
+    return compiler.compileSelect(
+      {
+        table: this.tableName,
+        columns: this.columns.length > 0 ? this.columns : undefined,
+        wheres: this.wheres.length > 0 ? this.wheres : undefined,
+        joins: this.joins.length > 0 ? this.joins : undefined,
+        orders: this.orders.length > 0 ? this.orders : undefined,
+        limit: this.limitValue,
+        offset: this.offsetValue,
+        distinct: this.distinctFlag
+      },
+      {
+        column: this.softDeleteColumn,
+        includeTrashed: this.includeTrashed,
+        onlyTrashed: this.onlyTrashedFlag
       }
-    }
-
-    return this.grammar.compileSelect({
-      table: this.tableName,
-      columns: this.columns.length > 0 ? this.columns : undefined,
-      wheres: wheres.length > 0 ? wheres : undefined,
-      joins: this.joins.length > 0 ? this.joins : undefined,
-      orders: this.orders.length > 0 ? this.orders : undefined,
-      limit: this.limitValue,
-      offset: this.offsetValue,
-      distinct: this.distinctFlag
-    })
+    )
   }
 
   /**
    * Hydrate a raw row into a model instance
    */
   protected hydrate(row: DatabaseRow): T {
-    if (!this.model) {
-      return row as T
-    }
-
-    const instance = new this.model()
-    if (instance instanceof Model) {
-      instance.setRawAttributes(row)
-      return instance as T
-    }
-
-    return row as T
-  }
-
-  /**
-   * Eager load relations for a set of models
-   */
-  private static async eagerLoadRelations(
-    models: Model[],
-    relations: string[]
-  ): Promise<void> {
-    if (models.length === 0 || relations.length === 0) {
-      return
-    }
-
-    const tree = Builder.buildRelationTree(relations)
-
-    for (const [relationName, nested] of Object.entries(tree)) {
-      const first = models[0]
-      const relationMethod = (first as unknown as Record<string, unknown>)[relationName]
-
-      if (typeof relationMethod !== 'function') {
-        throw new Error(`Relation ${relationName} does not exist on ${first.constructor.name}`)
-      }
-
-      const relation = (relationMethod as () => { eagerLoadForMany: (items: Model[], name: string) => Promise<void> })
-        .call(first)
-
-      await relation.eagerLoadForMany(models, relationName)
-
-      if (Object.keys(nested).length > 0) {
-        const relatedModels = Builder.collectRelatedModels(models, relationName)
-        await Builder.eagerLoadRelations(relatedModels, Builder.flattenRelationTree(nested))
-      }
-    }
-  }
-
-  private static buildRelationTree(relations: string[]): RelationTree {
-    const tree: RelationTree = {}
-
-    for (const relation of relations) {
-      const parts = relation.split('.')
-      let current: RelationTree = tree
-      for (const part of parts) {
-        if (!current[part]) {
-          current[part] = {}
-        }
-        current = current[part]
-      }
-    }
-
-    return tree
-  }
-
-  private static flattenRelationTree(tree: RelationTree): string[] {
-    const relations: string[] = []
-    for (const key of Object.keys(tree)) {
-      const nested = tree[key]
-      const nestedKeys = Object.keys(nested)
-      if (nestedKeys.length === 0) {
-        relations.push(key)
-      } else {
-        for (const sub of Builder.flattenRelationTree(nested)) {
-          relations.push(`${key}.${sub}`)
-        }
-      }
-    }
-    return relations
-  }
-
-  private static collectRelatedModels(models: Model[], relationName: string): Model[] {
-    const related: Model[] = []
-    for (const model of models) {
-      const value = model.getRelation(relationName)
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          if (item instanceof Model) {
-            related.push(item)
-          }
-        }
-      } else if (value instanceof Model) {
-        related.push(value)
-      }
-    }
-    return related
+    const hydrator = new ModelHydrator<T>(this.model)
+    return hydrator.hydrate(row)
   }
 
   /**
