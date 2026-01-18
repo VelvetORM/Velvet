@@ -7,9 +7,8 @@
 
 import { Builder } from '../Builder'
 import { Collection } from '../support/Collection'
-import type { Attributes } from '../contracts/ModelContract'
 import type { ComparisonOperator } from '../types'
-import type { Model, ModelConstructor } from '../Model'
+import type { Model, ModelAttributesOf, ModelConstructor } from '../Model'
 
 export class QueryProxy<T extends Model = Model> {
   private readonly modelClass: ModelConstructor<T>
@@ -55,8 +54,8 @@ export class QueryProxy<T extends Model = Model> {
     return this.all()
   }
 
-  async create(attributes: Partial<Attributes>): Promise<T> {
-    const ModelClass = this.modelClass as new (attrs?: Partial<Attributes>) => T
+  async create(attributes: Partial<ModelAttributesOf<T>>): Promise<T> {
+    const ModelClass = this.modelClass as new (attrs?: Partial<ModelAttributesOf<T>>) => T
     const instance = new ModelClass(attributes)
     await instance.save()
     return instance

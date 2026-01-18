@@ -5,8 +5,7 @@
  * Inspired by Laravel's Query Builder but with TypeScript type safety.
  */
 
-import { Model } from './Model'
-import type { ModelClass } from './Model'
+import type { Model, ModelClass } from './Model'
 import type {
   ComparisonOperator,
   SortDirection,
@@ -23,6 +22,8 @@ import { QueryExecutor } from './query/QueryExecutor'
 import type { BuilderContract } from './contracts/BuilderContract'
 import { QueryState } from './query/QueryState'
 import { QueryException } from './exceptions'
+import type { HydratableModelConstructor, HydratableModel } from './contracts/HydratableModel'
+import { isHydratableModel } from './contracts/HydratableModel'
 
 type ModelAttributeKeys<T> = T extends Model<infer A>
   ? Extract<keyof A, string>
@@ -32,7 +33,7 @@ type ModelAttributeValue<T, K extends string> = T extends Model<infer A>
   ? K extends keyof A ? A[K] : unknown
   : unknown
 
-type ModelLikeConstructor = ModelClass<Model>
+type ModelLikeConstructor = HydratableModelConstructor & ModelClass<Model>
 
 /**
  * Query Builder
@@ -484,7 +485,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
       const hydrator = new ModelHydrator<T>(this.model)
       const models = rows.map((row) => hydrator.hydrate(row))
       if (this.state.eagerLoad.length > 0) {
-        const modelItems = models.filter((item) => item instanceof Model) as Model[]
+        const modelItems = models.filter(isHydratableModel) as HydratableModel[]
         await RelationLoader.load(modelItems, this.state.eagerLoad)
       }
       return new Collection(models)

@@ -5,12 +5,12 @@
  */
 
 import type { DatabaseRow } from '../types'
-import type { Model, ModelConstructor } from '../Model'
+import type { HydratableModelConstructor } from '../contracts/HydratableModel'
 
 export class ModelHydrator<T = unknown> {
-  private readonly model?: ModelConstructor<Model>
+  private readonly model?: HydratableModelConstructor
 
-  constructor(model?: ModelConstructor<Model>) {
+  constructor(model?: HydratableModelConstructor) {
     this.model = model
   }
 
@@ -20,11 +20,7 @@ export class ModelHydrator<T = unknown> {
     }
 
     const instance = new this.model()
-    if ('setRawAttributes' in instance) {
-      (instance as Model).setRawAttributes(row)
-      return instance as T
-    }
-
-    return row as T
+    instance.setRawAttributes(row)
+    return instance as T
   }
 }

@@ -5,12 +5,12 @@
  * Provides a familiar API without forcing users away from User.query().
  */
 
-import type { Attributes } from '../contracts/ModelContract'
 import type { ComparisonOperator } from '../types'
 import { QueryProxy } from './QueryProxy'
-import type { Model, ModelConstructor } from '../Model'
+import type { Model, ModelAttributesOf, ModelConstructor } from '../Model'
+import type { RepositoryContract } from '../contracts/RepositoryContract'
 
-export class Repository<T extends Model = Model> {
+export class Repository<T extends Model = Model> implements RepositoryContract<T> {
   private readonly proxy: QueryProxy<T>
 
   constructor(modelClass: ModelConstructor<T>) {
@@ -54,7 +54,7 @@ export class Repository<T extends Model = Model> {
     return this.proxy.get()
   }
 
-  create(attributes: Partial<Attributes>) {
+  create(attributes: Partial<ModelAttributesOf<T>>) {
     return this.proxy.create(attributes)
   }
 
