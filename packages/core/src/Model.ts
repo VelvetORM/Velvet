@@ -19,7 +19,10 @@ import { ModelPersister } from './model/ModelPersister'
 import { ModelValidator } from './model/ModelValidator'
 import { QueryProxy } from './model/QueryProxy'
 import { Repository } from './model/Repository'
-import type { Attributes, ModelEvent, ModelConfiguration } from './contracts/ModelContract'
+import { RelationStore } from './model/concerns/RelationStore'
+import { EventRegistrar } from './model/concerns/EventRegistrar'
+import type { Attributes, ModelConfiguration } from './contracts/ModelContract'
+import type { ScopeRegistry } from './contracts/ModelBase'
 import type { ModelBaseStatic } from './contracts/ModelBase'
 import type { DatabaseRow, ComparisonOperator } from './types'
 import type { ValidationRules } from './support/InputValidator'
@@ -55,7 +58,7 @@ export interface ModelStatic {
  * Constructor type for Model subclasses
  */
 export type ModelConstructor<T extends Model = Model> =
-  (new (attributes?: Partial<Attributes>) => T) &
+  (new (attributes?: Partial<ModelAttributesOf<T>> | Record<string, unknown>) => T) &
   ModelStatic & {
     find(id: string | number): Promise<T | null>
     queryProxy(): QueryProxy<T>
@@ -168,7 +171,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
   protected readonly validator: ModelValidator
 
   /** Loaded relationships */
-  protected relations: Record<string, unknown> = {}
+  protected readonly relationStore: RelationStore
 
   /** Whether model exists in database */
   public exists: boolean = false
@@ -192,6 +195,9 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
   /** Validate on fill */
   protected validateOnFill: boolean = false
 
+  /** Named scopes registry */
+  protected scopes: ScopeRegistry<Builder<this>> = {}
+
   // ==========================================
   // CONSTRUCTOR
   // ==========================================
@@ -212,9 +218,12 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
       visible: this.visible
     })
 
+    // Initialize relation store
+    this.relationStore = new RelationStore()
+
     // Initialize event dispatcher and register handlers
     this.events = new ModelEventDispatcher<this>()
-    this.registerEventHandlers()
+    new EventRegistrar<this>(this.events, this).register()
 
     // Initialize persister and validator
     this.persister = new ModelPersister<TAttributes>(() => this.getConfig(), this.attributeBag)
@@ -304,7 +313,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
    */
   static async create<T extends Model>(
     this: ModelConstructor<T>,
-    attributes: Partial<Attributes>
+    attributes: Partial<ModelAttributesOf<T>>
   ): Promise<T> {
     return this.queryProxy().create(attributes)
   }
@@ -384,6 +393,15 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     name: string,
     ...args: unknown[]
   ): Builder<T> {
+    const query = this.queryProxy().query()
+
+    const scopes = Reflect.get(this.prototype, 'scopes') as ScopeRegistry<Builder<T>> | undefined
+    const scoped = scopes?.[name]
+    if (typeof scoped === 'function') {
+      const result = scoped(query, ...args)
+      return result instanceof Builder ? result : query
+    }
+
     return this.queryProxy().scope(name, ...args)
   }
 
@@ -637,7 +655,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
    * Convert to JSON object
    */
   toJSON(): Record<string, unknown> {
-    return this.serializer.serialize(this.attributeBag, this.relations)
+    return this.serializer.serialize(this.attributeBag, this.relationStore.all())
   }
 
   /**
@@ -655,21 +673,21 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
    * Set a relation value
    */
   setRelation(name: string, value: unknown): void {
-    this.relations[name] = value
+    this.relationStore.set(name, value)
   }
 
   /**
    * Get a relation value
    */
   getRelation(name: string): unknown {
-    return this.relations[name]
+    return this.relationStore.get(name)
   }
 
   /**
    * Check if relation is loaded
    */
   hasRelation(name: string): boolean {
-    return name in this.relations
+    return this.relationStore.has(name)
   }
 
   // ==========================================
@@ -758,20 +776,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
   /**
    * Register event handlers from instance methods
    */
-  private registerEventHandlers(): void {
-    const eventMethods: ModelEvent[] = [
-      'creating', 'created', 'updating', 'updated',
-      'saving', 'saved', 'deleting', 'deleted',
-      'restoring', 'restored'
-    ]
-
-    for (const event of eventMethods) {
-      const method = Reflect.get(this, event)
-      if (typeof method === 'function') {
-        this.events.on(event, method.bind(this) as () => void | Promise<void>)
-      }
-    }
-  }
+  // Event registration delegated to EventRegistrar
 
   // ==========================================
   // VALIDATION
