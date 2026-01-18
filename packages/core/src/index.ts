@@ -80,6 +80,8 @@ export { Grammar } from './query/grammar/Grammar'
 export { GrammarFactory } from './query/grammar/GrammarFactory'
 export { SqliteGrammar } from './query/grammar/SqliteGrammar'
 export { QueryCompiler } from './query/QueryCompiler'
+export { QueryState } from './query/QueryState'
+export { QueryExecutor } from './query/QueryExecutor'
 
 // ==========================================
 // TYPES

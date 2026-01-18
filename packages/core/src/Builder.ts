@@ -10,20 +10,18 @@ import type { ModelClass } from './Model'
 import type {
   ComparisonOperator,
   SortDirection,
-  WhereClause,
-  JoinClause,
-  OrderByClause,
   PaginatedResult,
   DatabaseRow
 } from './types'
-import { Database } from './Database'
 import { GrammarFactory } from './query/grammar/GrammarFactory'
 import { Collection } from './support/Collection'
 import type { Grammar } from './query/grammar/Grammar'
 import { ModelHydrator } from './model/ModelHydrator'
 import { RelationLoader } from './model/RelationLoader'
 import { QueryCompiler } from './query/QueryCompiler'
+import { QueryExecutor } from './query/QueryExecutor'
 import type { BuilderContract } from './contracts/BuilderContract'
+import { QueryState } from './query/QueryState'
 
 type ModelAttributeKeys<T> = T extends Model<infer A>
   ? Extract<keyof A, string>
@@ -71,59 +69,9 @@ export class Builder<T = unknown> implements BuilderContract<T> {
   protected model?: ModelLikeConstructor
 
   /**
-   * SELECT columns
+   * Query state
    */
-  protected columns: string[] = []
-
-  /**
-   * WHERE clauses
-   */
-  protected wheres: WhereClause[] = []
-
-  /**
-   * JOIN clauses
-   */
-  protected joins: JoinClause[] = []
-
-  /**
-   * ORDER BY clauses
-   */
-  protected orders: OrderByClause[] = []
-
-  /**
-   * LIMIT value
-   */
-  protected limitValue?: number
-
-  /**
-   * OFFSET value
-   */
-  protected offsetValue?: number
-
-  /**
-   * DISTINCT flag
-   */
-  protected distinctFlag: boolean = false
-
-  /**
-   * Relations to eager load (for Model)
-   */
-  protected eagerLoad: string[] = []
-
-  /**
-   * Soft delete column (if model uses soft deletes)
-   */
-  protected softDeleteColumn?: string
-
-  /**
-   * Include soft deleted records
-   */
-  protected includeTrashed: boolean = false
-
-  /**
-   * Only soft deleted records
-   */
-  protected onlyTrashedFlag: boolean = false
+  protected state: QueryState
 
   /**
    * Create a new query builder
@@ -147,9 +95,10 @@ export class Builder<T = unknown> implements BuilderContract<T> {
 
     this.connectionName = connectionName
     this.grammar = GrammarFactory.create(connectionName)
+    this.state = new QueryState()
 
     if (this.model?.softDeletes) {
-      this.softDeleteColumn = this.model.deletedAtColumn || 'deleted_at'
+      this.state.softDeleteColumn = this.model.deletedAtColumn || 'deleted_at'
     }
   }
 
@@ -166,9 +115,9 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     }
 
     if (model.softDeletes) {
-      this.softDeleteColumn = model.deletedAtColumn || 'deleted_at'
+      this.state.softDeleteColumn = model.deletedAtColumn || 'deleted_at'
     } else {
-      this.softDeleteColumn = undefined
+      this.state.softDeleteColumn = undefined
     }
 
     return this
@@ -192,7 +141,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
   select(...columns: string[]): this {
     // Flatten array if passed
     const flattened = columns.flat()
-    this.columns = flattened.length > 0 ? flattened : ['*']
+    this.state.columns = flattened.length > 0 ? flattened : ['*']
     return this
   }
 
@@ -205,7 +154,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * ```
    */
   distinct(): this {
-    this.distinctFlag = true
+    this.state.distinctFlag = true
     return this
   }
 
@@ -244,7 +193,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
       operator = '='
     }
 
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'basic',
       column,
       operator: operator as ComparisonOperator,
@@ -259,7 +208,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * Add a WHERE clause with an untyped column name
    */
   whereColumn(column: string, value: unknown): this {
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'basic',
       column,
       operator: '=',
@@ -273,7 +222,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * Add a WHERE IN clause with an untyped column name
    */
   whereInColumn(column: string, values: unknown[]): this {
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'in',
       column,
       values,
@@ -302,7 +251,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
       operator = '='
     }
 
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'basic',
       column,
       operator: operator as ComparisonOperator,
@@ -326,7 +275,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     values: Array<ModelAttributeValue<T, K>>
   ): this
   whereIn(column: string, values: unknown[]): this {
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'in',
       column,
       values,
@@ -344,7 +293,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     values: Array<ModelAttributeValue<T, K>>
   ): this
   whereNotIn(column: string, values: unknown[]): this {
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'in',
       column,
       values,
@@ -360,7 +309,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    */
   whereNull<K extends ModelAttributeKeys<T>>(column: K): this
   whereNull(column: string): this {
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'null',
       column,
       boolean: 'AND'
@@ -374,7 +323,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    */
   whereNotNull<K extends ModelAttributeKeys<T>>(column: K): this
   whereNotNull(column: string): this {
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'null',
       column,
       boolean: 'AND',
@@ -392,7 +341,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     values: [ModelAttributeValue<T, K>, ModelAttributeValue<T, K>]
   ): this
   whereBetween(column: string, values: [unknown, unknown]): this {
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'between',
       column,
       values,
@@ -414,7 +363,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * ```
    */
   whereRaw(sql: string, bindings?: unknown[]): this {
-    this.wheres.push({
+    this.state.wheres.push({
       type: 'raw',
       value: sql,
       values: bindings,
@@ -437,7 +386,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
   ): this
   orderBy(column: string, direction?: SortDirection): this
   orderBy(column: string, direction: SortDirection = 'asc'): this {
-    this.orders.push({ column, direction })
+    this.state.orders.push({ column, direction })
     return this
   }
 
@@ -459,7 +408,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * Set LIMIT
    */
   limit(value: number): this {
-    this.limitValue = value
+    this.state.limitValue = value
     return this
   }
 
@@ -474,7 +423,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * Set OFFSET
    */
   offset(value: number): this {
-    this.offsetValue = value
+    this.state.offsetValue = value
     return this
   }
 
@@ -503,14 +452,15 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    */
   async get(): Promise<Collection<T>> {
     const { sql, bindings } = this.toSql()
-    const rows = await Database.select<DatabaseRow>(sql, bindings, this.connectionName)
+    const executor = new QueryExecutor(this.connectionName)
+    const rows = await executor.select<DatabaseRow>(sql, bindings)
 
     if (this.model) {
       const hydrator = new ModelHydrator<T>(this.model)
       const models = rows.map((row) => hydrator.hydrate(row))
-      if (this.eagerLoad.length > 0) {
+      if (this.state.eagerLoad.length > 0) {
         const modelItems = models.filter((item) => item instanceof Model) as Model[]
-        await RelationLoader.load(modelItems, this.eagerLoad)
+        await RelationLoader.load(modelItems, this.state.eagerLoad)
       }
       return new Collection(models)
     }
@@ -563,7 +513,8 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     const { sql, bindings } = this.toSql()
     const countSql = sql.replace(/SELECT .* FROM/, `SELECT COUNT(${column}) as count FROM`)
 
-    const result = await Database.select(countSql, bindings, this.connectionName)
+    const executor = new QueryExecutor(this.connectionName)
+    const result = await executor.select(countSql, bindings)
     return Number(result[0]?.count || 0)
   }
 
@@ -640,7 +591,8 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     const { sql, bindings } = this.toSql()
     const aggSql = sql.replace(/SELECT .* FROM/, `SELECT ${fn}(${column}) as aggregate FROM`)
 
-    const result = await Database.select(aggSql, bindings, this.connectionName)
+    const executor = new QueryExecutor(this.connectionName)
+    const result = await executor.select(aggSql, bindings)
     return Number(result[0]?.aggregate || 0)
   }
 
@@ -654,7 +606,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * @param relations - Relation names to load
    */
   with(...relations: string[]): this {
-    this.eagerLoad.push(...relations)
+    this.state.eagerLoad.push(...relations)
     return this
   }
 
@@ -662,8 +614,8 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * Include soft deleted records
    */
   withTrashed(): this {
-    this.includeTrashed = true
-    this.onlyTrashedFlag = false
+    this.state.includeTrashed = true
+    this.state.onlyTrashedFlag = false
     return this
   }
 
@@ -671,8 +623,8 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * Only soft deleted records
    */
   onlyTrashed(): this {
-    this.includeTrashed = true
-    this.onlyTrashedFlag = true
+    this.state.includeTrashed = true
+    this.state.onlyTrashedFlag = true
     return this
   }
 
@@ -690,18 +642,18 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     return compiler.compileSelect(
       {
         table: this.tableName,
-        columns: this.columns.length > 0 ? this.columns : undefined,
-        wheres: this.wheres.length > 0 ? this.wheres : undefined,
-        joins: this.joins.length > 0 ? this.joins : undefined,
-        orders: this.orders.length > 0 ? this.orders : undefined,
-        limit: this.limitValue,
-        offset: this.offsetValue,
-        distinct: this.distinctFlag
+        columns: this.state.columns.length > 0 ? this.state.columns : undefined,
+        wheres: this.state.wheres.length > 0 ? this.state.wheres : undefined,
+        joins: this.state.joins.length > 0 ? this.state.joins : undefined,
+        orders: this.state.orders.length > 0 ? this.state.orders : undefined,
+        limit: this.state.limitValue,
+        offset: this.state.offsetValue,
+        distinct: this.state.distinctFlag
       },
       {
-        column: this.softDeleteColumn,
-        includeTrashed: this.includeTrashed,
-        onlyTrashed: this.onlyTrashedFlag
+        column: this.state.softDeleteColumn,
+        includeTrashed: this.state.includeTrashed,
+        onlyTrashed: this.state.onlyTrashedFlag
       }
     )
   }
@@ -721,17 +673,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     const cloned = new Builder<T>(this.tableName, this.connectionName)
     cloned.grammar = this.grammar
     cloned.model = this.model
-    cloned.columns = [...this.columns]
-    cloned.wheres = [...this.wheres]
-    cloned.joins = [...this.joins]
-    cloned.orders = [...this.orders]
-    cloned.limitValue = this.limitValue
-    cloned.offsetValue = this.offsetValue
-    cloned.distinctFlag = this.distinctFlag
-    cloned.eagerLoad = [...this.eagerLoad]
-    cloned.softDeleteColumn = this.softDeleteColumn
-    cloned.includeTrashed = this.includeTrashed
-    cloned.onlyTrashedFlag = this.onlyTrashedFlag
+    cloned.state = this.state.clone()
     return cloned
   }
 }
