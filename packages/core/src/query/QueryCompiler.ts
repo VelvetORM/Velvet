@@ -6,6 +6,7 @@
 
 import type { Grammar } from './grammar/Grammar'
 import type { WhereClause, JoinClause, OrderByClause } from '../types'
+import { QuerySanitizer } from '../support/QuerySanitizer'
 
 export interface QueryComponents {
   table: string
@@ -37,33 +38,36 @@ export class QueryCompiler {
     components: QueryComponents,
     softDelete?: SoftDeleteConfig
   ): { sql: string; bindings: unknown[] } {
-    const cacheKey = this.getCacheKey(components, softDelete)
+    const sanitizedComponents = this.sanitizeComponents(components)
+    const sanitizedSoftDelete = this.sanitizeSoftDelete(softDelete)
+
+    const cacheKey = this.getCacheKey(sanitizedComponents, sanitizedSoftDelete)
     const cached = this.cache.get(cacheKey)
     if (cached) {
       return cached
     }
 
-    const wheres = [...(components.wheres ?? [])]
+    const wheres = [...(sanitizedComponents.wheres ?? [])]
 
-    if (softDelete?.column) {
-      if (softDelete.onlyTrashed) {
+    if (sanitizedSoftDelete?.column) {
+      if (sanitizedSoftDelete.onlyTrashed) {
         wheres.push({
           type: 'null',
-          column: softDelete.column,
+          column: sanitizedSoftDelete.column,
           boolean: 'AND',
           not: true
         })
-      } else if (!softDelete.includeTrashed) {
+      } else if (!sanitizedSoftDelete.includeTrashed) {
         wheres.push({
           type: 'null',
-          column: softDelete.column,
+          column: sanitizedSoftDelete.column,
           boolean: 'AND'
         })
       }
     }
 
     const compiled = this.grammar.compileSelect({
-      ...components,
+      ...sanitizedComponents,
       wheres: wheres.length > 0 ? wheres : undefined
     })
 
@@ -88,5 +92,64 @@ export class QueryCompiler {
     }
 
     return JSON.stringify(base)
+  }
+
+  private sanitizeComponents(components: QueryComponents): QueryComponents {
+    const sanitized: QueryComponents = {
+      ...components,
+      table: QuerySanitizer.sanitizeTableName(components.table)
+    }
+
+    if (components.columns) {
+      sanitized.columns = QuerySanitizer.sanitizeIdentifiers(components.columns, 'column name')
+    }
+
+    if (components.joins) {
+      sanitized.joins = components.joins.map((join): JoinClause => ({
+        ...join,
+        table: QuerySanitizer.sanitizeTableName(join.table),
+        first: QuerySanitizer.sanitizeIdentifier(join.first, 'join column'),
+        second: QuerySanitizer.sanitizeIdentifier(join.second, 'join column')
+      }))
+    }
+
+    if (components.orders) {
+      sanitized.orders = components.orders.map((order): OrderByClause => ({
+        ...order,
+        column: QuerySanitizer.sanitizeIdentifier(order.column, 'order column')
+      }))
+    }
+
+    if (components.wheres) {
+      sanitized.wheres = components.wheres.map((where): WhereClause => {
+        if (!where.column) {
+          return where
+        }
+
+        if (where.type === 'raw') {
+          return where
+        }
+
+        return {
+          ...where,
+          column: QuerySanitizer.sanitizeIdentifier(where.column, 'where column')
+        }
+      })
+    }
+
+    return sanitized
+  }
+
+  private sanitizeSoftDelete(softDelete?: SoftDeleteConfig): SoftDeleteConfig | undefined {
+    if (!softDelete) {
+      return undefined
+    }
+
+    return {
+      ...softDelete,
+      column: softDelete.column
+        ? QuerySanitizer.sanitizeColumnName(softDelete.column)
+        : undefined
+    }
   }
 }

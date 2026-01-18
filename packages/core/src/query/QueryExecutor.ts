@@ -6,8 +6,9 @@
 
 import { Database } from '../Database'
 import type { DatabaseRow } from '../types'
+import type { QueryExecutorContract } from '../contracts/QueryExecutorContract'
 
-export class QueryExecutor {
+export class QueryExecutor implements QueryExecutorContract {
   private readonly connectionName?: string
 
   constructor(connectionName?: string) {
