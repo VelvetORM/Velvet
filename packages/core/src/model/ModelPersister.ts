@@ -7,7 +7,8 @@
 
 import type { Attributes, ModelConfiguration } from '../contracts/ModelContract'
 import { Database } from '../Database'
-import { QuerySanitizer } from '../support/QuerySanitizer'
+import { GrammarFactory } from '../query/grammar/GrammarFactory'
+import type { WhereClause } from '../types'
 import type { AttributeBag } from './AttributeBag'
 
 export class ModelPersister<TAttributes extends Attributes = Attributes> {
@@ -26,16 +27,9 @@ export class ModelPersister<TAttributes extends Attributes = Attributes> {
     const config = this.getConfig()
     const attributes = this.getInsertAttributes(config)
 
-    const safeTable = QuerySanitizer.sanitizeTableName(config.table)
-    const columns = Object.keys(attributes)
-    const safeColumns = QuerySanitizer.sanitizeIdentifiers(columns, 'column name')
-    const placeholders = safeColumns.map(() => '?').join(', ')
-    const columnsList = safeColumns.map((c) => `"${c}"`).join(', ')
-
-    const sql = `INSERT INTO "${safeTable}" (${columnsList}) VALUES (${placeholders})`
-    const bindings = Object.values(attributes)
-
-    return Database.insert(sql, bindings, config.connection)
+    const grammar = GrammarFactory.create(config.connection)
+    const compiled = grammar.compileInsert(config.table, attributes)
+    return Database.insert(compiled.sql, compiled.bindings, config.connection)
   }
 
   async update(primaryKeyValue: unknown): Promise<number> {
@@ -46,27 +40,31 @@ export class ModelPersister<TAttributes extends Attributes = Attributes> {
       return 0
     }
 
-    const safeTable = QuerySanitizer.sanitizeTableName(config.table)
-    const safePrimaryKey = QuerySanitizer.sanitizeColumnName(config.primaryKey)
-
-    const sets = Object.keys(attributes)
-      .map((key) => `"${QuerySanitizer.sanitizeColumnName(key)}" = ?`)
-      .join(', ')
-
-    const sql = `UPDATE "${safeTable}" SET ${sets} WHERE "${safePrimaryKey}" = ?`
-    const bindings = [...Object.values(attributes), primaryKeyValue]
-
-    return Database.update(sql, bindings, config.connection)
+    const grammar = GrammarFactory.create(config.connection)
+    const wheres: WhereClause[] = [{
+      type: 'basic',
+      column: config.primaryKey,
+      operator: '=',
+      value: primaryKeyValue,
+      boolean: 'AND'
+    }]
+    const compiled = grammar.compileUpdate(config.table, attributes, wheres)
+    return Database.update(compiled.sql, compiled.bindings, config.connection)
   }
 
   async delete(primaryKeyValue: unknown): Promise<number> {
     const config = this.getConfig()
 
-    const safeTable = QuerySanitizer.sanitizeTableName(config.table)
-    const safePrimaryKey = QuerySanitizer.sanitizeColumnName(config.primaryKey)
-
-    const sql = `DELETE FROM "${safeTable}" WHERE "${safePrimaryKey}" = ?`
-    return Database.delete(sql, [primaryKeyValue], config.connection)
+    const grammar = GrammarFactory.create(config.connection)
+    const wheres: WhereClause[] = [{
+      type: 'basic',
+      column: config.primaryKey,
+      operator: '=',
+      value: primaryKeyValue,
+      boolean: 'AND'
+    }]
+    const compiled = grammar.compileDelete(config.table, wheres)
+    return Database.delete(compiled.sql, compiled.bindings, config.connection)
   }
 
   private getInsertAttributes(config: ModelConfiguration): Record<string, unknown> {

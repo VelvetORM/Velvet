@@ -10,7 +10,8 @@ import type { DatabaseRow } from '../types'
 import { Relation } from './Relation'
 import { Builder } from '../Builder'
 import { Database } from '../Database'
-import { QuerySanitizer } from '../support/QuerySanitizer'
+import { GrammarFactory } from '../query/grammar/GrammarFactory'
+import type { WhereClause } from '../types'
 
 /**
  * BelongsToMany relation
@@ -115,14 +116,9 @@ export class BelongsToMany<TRelated extends ModelBase = ModelBase> extends Relat
         ...attributes
       }
 
-      const columns = Object.keys(pivotData)
-      const safeTable = QuerySanitizer.sanitizeTableName(this.pivotTable)
-      const safeColumns = QuerySanitizer.sanitizeIdentifiers(columns, 'pivot column')
-      const placeholders = safeColumns.map(() => '?').join(', ')
-      const columnsList = safeColumns.map((c) => `"${c}"`).join(', ')
-
-      const sql = `INSERT INTO "${safeTable}" (${columnsList}) VALUES (${placeholders})`
-      await Database.insert(sql, Object.values(pivotData), this.connectionName)
+      const grammar = GrammarFactory.create(this.connectionName)
+      const compiled = grammar.compileInsert(this.pivotTable, pivotData)
+      await Database.insert(compiled.sql, compiled.bindings, this.connectionName)
     }
   }
 
@@ -134,18 +130,36 @@ export class BelongsToMany<TRelated extends ModelBase = ModelBase> extends Relat
 
     if (ids === undefined) {
       // Detach all
-      const safeTable = QuerySanitizer.sanitizeTableName(this.pivotTable)
-      const safeForeignKey = QuerySanitizer.sanitizeColumnName(this.foreignPivotKey)
-      const sql = `DELETE FROM "${safeTable}" WHERE "${safeForeignKey}" = ?`
-      await Database.delete(sql, [parentId], this.connectionName)
+      const grammar = GrammarFactory.create(this.connectionName)
+      const wheres: WhereClause[] = [{
+        type: 'basic',
+        column: this.foreignPivotKey,
+        operator: '=',
+        value: parentId,
+        boolean: 'AND'
+      }]
+      const compiled = grammar.compileDelete(this.pivotTable, wheres)
+      await Database.delete(compiled.sql, compiled.bindings, this.connectionName)
     } else {
       const idsArray = Array.isArray(ids) ? ids : [ids]
-      const placeholders = idsArray.map(() => '?').join(', ')
-      const safeTable = QuerySanitizer.sanitizeTableName(this.pivotTable)
-      const safeForeignKey = QuerySanitizer.sanitizeColumnName(this.foreignPivotKey)
-      const safeRelatedKey = QuerySanitizer.sanitizeColumnName(this.relatedPivotKey)
-      const sql = `DELETE FROM "${safeTable}" WHERE "${safeForeignKey}" = ? AND "${safeRelatedKey}" IN (${placeholders})`
-      await Database.delete(sql, [parentId, ...idsArray], this.connectionName)
+      const grammar = GrammarFactory.create(this.connectionName)
+      const wheres: WhereClause[] = [
+        {
+          type: 'basic',
+          column: this.foreignPivotKey,
+          operator: '=',
+          value: parentId,
+          boolean: 'AND'
+        },
+        {
+          type: 'in',
+          column: this.relatedPivotKey,
+          values: idsArray,
+          boolean: 'AND'
+        }
+      ]
+      const compiled = grammar.compileDelete(this.pivotTable, wheres)
+      await Database.delete(compiled.sql, compiled.bindings, this.connectionName)
     }
   }
 

@@ -4,12 +4,13 @@
  * Handles eager-loading of relations for models.
  */
 
-import { Model } from '../Model'
+import type { HydratableModel } from '../contracts/HydratableModel'
+import { isHydratableModel } from '../contracts/HydratableModel'
 
 type RelationTree = { [key: string]: RelationTree }
 
 export class RelationLoader {
-  static async load(models: Model[], relations: string[]): Promise<void> {
+  static async load(models: HydratableModel[], relations: string[]): Promise<void> {
     if (models.length === 0 || relations.length === 0) {
       return
     }
@@ -25,7 +26,7 @@ export class RelationLoader {
       }
 
       const relation = (relationMethod as () => {
-        eagerLoadForMany: (items: Model[], name: string) => Promise<void>
+        eagerLoadForMany: (items: HydratableModel[], name: string) => Promise<void>
       }).call(first)
 
       await relation.eagerLoadForMany(models, relationName)
@@ -70,17 +71,17 @@ export class RelationLoader {
     return relations
   }
 
-  private static collectRelatedModels(models: Model[], relationName: string): Model[] {
-    const related: Model[] = []
+  private static collectRelatedModels(models: HydratableModel[], relationName: string): HydratableModel[] {
+    const related: HydratableModel[] = []
     for (const model of models) {
       const value = model.getRelation(relationName)
       if (Array.isArray(value)) {
         for (const item of value) {
-          if (item instanceof Model) {
+          if (isHydratableModel(item)) {
             related.push(item)
           }
         }
-      } else if (value instanceof Model) {
+      } else if (isHydratableModel(value)) {
         related.push(value)
       }
     }
