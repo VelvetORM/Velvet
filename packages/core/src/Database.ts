@@ -6,7 +6,7 @@
  */
 
 import { ConnectionManager } from './connection/ConnectionManager'
-import type { DatabaseConfig } from './types'
+import type { DatabaseConfig, DatabaseRow, RawQueryResult, SqlBindings } from './types'
 import type { DriverContract } from './drivers/contracts/DriverContract'
 
 /**
@@ -119,7 +119,11 @@ export class Database {
    * const users = await Database.select('SELECT * FROM users WHERE active = ?', [true])
    * ```
    */
-  static async select(sql: string, bindings?: any[], connectionName?: string): Promise<any[]> {
+  static async select<TRow extends DatabaseRow = DatabaseRow>(
+    sql: string,
+    bindings?: SqlBindings,
+    connectionName?: string
+  ): Promise<TRow[]> {
     const connection = ConnectionManager.connection(connectionName)
     return connection.select(sql, bindings)
   }
@@ -140,7 +144,11 @@ export class Database {
    * )
    * ```
    */
-  static async insert(sql: string, bindings?: any[], connectionName?: string): Promise<number | string> {
+  static async insert(
+    sql: string,
+    bindings?: SqlBindings,
+    connectionName?: string
+  ): Promise<number | string | bigint> {
     const connection = ConnectionManager.connection(connectionName)
     return connection.insert(sql, bindings)
   }
@@ -161,7 +169,11 @@ export class Database {
    * )
    * ```
    */
-  static async update(sql: string, bindings?: any[], connectionName?: string): Promise<number> {
+  static async update(
+    sql: string,
+    bindings?: SqlBindings,
+    connectionName?: string
+  ): Promise<number> {
     const connection = ConnectionManager.connection(connectionName)
     return connection.update(sql, bindings)
   }
@@ -179,7 +191,11 @@ export class Database {
    * const deleted = await Database.delete('DELETE FROM users WHERE id = ?', [1])
    * ```
    */
-  static async delete(sql: string, bindings?: any[], connectionName?: string): Promise<number> {
+  static async delete(
+    sql: string,
+    bindings?: SqlBindings,
+    connectionName?: string
+  ): Promise<number> {
     const connection = ConnectionManager.connection(connectionName)
     return connection.delete(sql, bindings)
   }
@@ -198,7 +214,11 @@ export class Database {
    * console.log(result.rows)
    * ```
    */
-  static async raw(sql: string, bindings?: any[], connectionName?: string) {
+  static async raw(
+    sql: string,
+    bindings?: SqlBindings,
+    connectionName?: string
+  ): Promise<RawQueryResult> {
     const connection = ConnectionManager.connection(connectionName)
     return connection.query(sql, bindings)
   }
@@ -315,5 +335,15 @@ export class Database {
    */
   static getDefaultConnectionName(): string {
     return ConnectionManager.getDefaultConnectionName()
+  }
+
+  /**
+   * Get a connection pool by name
+   *
+   * @param name - Connection name (uses default if not specified)
+   * @returns Pool instance
+   */
+  static pool(name?: string) {
+    return ConnectionManager.pool(name)
   }
 }

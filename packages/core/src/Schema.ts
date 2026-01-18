@@ -6,7 +6,7 @@
  */
 
 import { Database } from "./Database";
-import type { ColumnDefinition } from "./types";
+import type { ColumnDefinition, ColumnType, DatabaseRow } from "./types";
 import { QuerySanitizer } from "./support/QuerySanitizer";
 
 /**
@@ -17,8 +17,8 @@ import { QuerySanitizer } from "./support/QuerySanitizer";
 class ColumnBuilder {
   private definition: Partial<ColumnDefinition>;
 
-  constructor(name: string, type: string) {
-    this.definition = { name, type } as any;
+  constructor(name: string, type: ColumnType) {
+    this.definition = { name, type };
   }
 
   /**
@@ -32,7 +32,7 @@ class ColumnBuilder {
   /**
    * Set default value
    */
-  default(value: any): this {
+  default(value: unknown): this {
     this.definition.default = value;
     return this;
   }
@@ -449,6 +449,12 @@ export class Schema {
       connectionName
     );
 
-    return result.rows.some((row: any) => row.name === safeColumnName);
+    return result.rows.some((row: DatabaseRow) => {
+      if (!row || typeof row !== "object") {
+        return false;
+      }
+      const candidate = row as { name?: unknown };
+      return candidate.name === safeColumnName;
+    });
   }
 }
