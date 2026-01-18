@@ -22,6 +22,7 @@ import { QueryCompiler } from './query/QueryCompiler'
 import { QueryExecutor } from './query/QueryExecutor'
 import type { BuilderContract } from './contracts/BuilderContract'
 import { QueryState } from './query/QueryState'
+import { QueryException } from './exceptions'
 
 type ModelAttributeKeys<T> = T extends Model<infer A>
   ? Extract<keyof A, string>
@@ -363,6 +364,15 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * ```
    */
   whereRaw(sql: string, bindings?: unknown[]): this {
+    if (!this.state.allowUnsafeRaw) {
+      throw new QueryException(
+        'Raw where clauses are disabled. Call allowUnsafeRaw() to enable.',
+        sql,
+        bindings,
+        'UNSAFE_RAW_QUERY'
+      )
+    }
+
     this.state.wheres.push({
       type: 'raw',
       value: sql,
@@ -371,6 +381,21 @@ export class Builder<T = unknown> implements BuilderContract<T> {
     })
 
     return this
+  }
+
+  /**
+   * Allow raw SQL clauses (unsafe)
+   */
+  allowUnsafeRaw(): this {
+    this.state.allowUnsafeRaw = true
+    return this
+  }
+
+  /**
+   * Add a raw WHERE clause (unsafe, explicit)
+   */
+  unsafeWhereRaw(sql: string, bindings?: unknown[]): this {
+    return this.allowUnsafeRaw().whereRaw(sql, bindings)
   }
 
   // ==========================================

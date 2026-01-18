@@ -15,6 +15,7 @@ export interface BuilderContract<T = unknown> {
   whereNull(column: string): this
   whereNotNull(column: string): this
   whereBetween(column: string, values: [unknown, unknown]): this
+  whereRaw(sql: string, bindings?: unknown[]): this
   orWhere(column: string, value: unknown): this
   orWhere(column: string, operator: ComparisonOperator, value: unknown): this
   orderBy(column: string, direction?: SortDirection): this
@@ -23,6 +24,8 @@ export interface BuilderContract<T = unknown> {
   with(...relations: string[]): this
   withTrashed(): this
   onlyTrashed(): this
+  allowUnsafeRaw(): this
+  unsafeWhereRaw(sql: string, bindings?: unknown[]): this
 
   get(): Promise<Collection<T>>
   first(): Promise<T | null>

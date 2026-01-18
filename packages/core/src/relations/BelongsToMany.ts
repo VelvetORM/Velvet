@@ -10,6 +10,7 @@ import type { DatabaseRow } from '../types'
 import { Relation } from './Relation'
 import { Builder } from '../Builder'
 import { Database } from '../Database'
+import { QuerySanitizer } from '../support/QuerySanitizer'
 
 /**
  * BelongsToMany relation
@@ -115,10 +116,12 @@ export class BelongsToMany<TRelated extends ModelBase = ModelBase> extends Relat
       }
 
       const columns = Object.keys(pivotData)
-      const placeholders = columns.map(() => '?').join(', ')
-      const columnsList = columns.map((c) => `"${c}"`).join(', ')
+      const safeTable = QuerySanitizer.sanitizeTableName(this.pivotTable)
+      const safeColumns = QuerySanitizer.sanitizeIdentifiers(columns, 'pivot column')
+      const placeholders = safeColumns.map(() => '?').join(', ')
+      const columnsList = safeColumns.map((c) => `"${c}"`).join(', ')
 
-      const sql = `INSERT INTO "${this.pivotTable}" (${columnsList}) VALUES (${placeholders})`
+      const sql = `INSERT INTO "${safeTable}" (${columnsList}) VALUES (${placeholders})`
       await Database.insert(sql, Object.values(pivotData), this.connectionName)
     }
   }
@@ -131,12 +134,17 @@ export class BelongsToMany<TRelated extends ModelBase = ModelBase> extends Relat
 
     if (ids === undefined) {
       // Detach all
-      const sql = `DELETE FROM "${this.pivotTable}" WHERE "${this.foreignPivotKey}" = ?`
+      const safeTable = QuerySanitizer.sanitizeTableName(this.pivotTable)
+      const safeForeignKey = QuerySanitizer.sanitizeColumnName(this.foreignPivotKey)
+      const sql = `DELETE FROM "${safeTable}" WHERE "${safeForeignKey}" = ?`
       await Database.delete(sql, [parentId], this.connectionName)
     } else {
       const idsArray = Array.isArray(ids) ? ids : [ids]
       const placeholders = idsArray.map(() => '?').join(', ')
-      const sql = `DELETE FROM "${this.pivotTable}" WHERE "${this.foreignPivotKey}" = ? AND "${this.relatedPivotKey}" IN (${placeholders})`
+      const safeTable = QuerySanitizer.sanitizeTableName(this.pivotTable)
+      const safeForeignKey = QuerySanitizer.sanitizeColumnName(this.foreignPivotKey)
+      const safeRelatedKey = QuerySanitizer.sanitizeColumnName(this.relatedPivotKey)
+      const sql = `DELETE FROM "${safeTable}" WHERE "${safeForeignKey}" = ? AND "${safeRelatedKey}" IN (${placeholders})`
       await Database.delete(sql, [parentId, ...idsArray], this.connectionName)
     }
   }

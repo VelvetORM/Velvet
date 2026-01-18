@@ -18,6 +18,7 @@ export class QueryState {
   softDeleteColumn?: string
   includeTrashed: boolean = false
   onlyTrashedFlag: boolean = false
+  allowUnsafeRaw: boolean = false
 
   clone(): QueryState {
     const cloned = new QueryState()
@@ -32,6 +33,7 @@ export class QueryState {
     cloned.softDeleteColumn = this.softDeleteColumn
     cloned.includeTrashed = this.includeTrashed
     cloned.onlyTrashedFlag = this.onlyTrashedFlag
+    cloned.allowUnsafeRaw = this.allowUnsafeRaw
     return cloned
   }
 }
