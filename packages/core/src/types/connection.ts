@@ -63,6 +63,13 @@ export interface SqliteConnectionConfig {
 /**
  * Generic database configuration
  */
+export interface PoolConfig {
+  min?: number
+  max?: number
+  acquireTimeoutMillis?: number
+  idleTimeoutMillis?: number
+}
+
 export interface DatabaseConfig {
   /**
    * Database client type
@@ -77,12 +84,7 @@ export interface DatabaseConfig {
   /**
    * Connection pool configuration
    */
-  pool?: {
-    min?: number
-    max?: number
-    acquireTimeoutMillis?: number
-    idleTimeoutMillis?: number
-  }
+  pool?: PoolConfig
 
   /**
    * Enable query logging
@@ -96,13 +98,23 @@ export interface DatabaseConfig {
 }
 
 /**
+ * SQL bindings for prepared statements
+ */
+export type SqlBindings = unknown[]
+
+/**
+ * Database row shape
+ */
+export type DatabaseRow = Record<string, unknown>
+
+/**
  * Raw query result from database driver
  */
-export interface RawQueryResult {
+export interface RawQueryResult<TRow extends DatabaseRow = DatabaseRow> {
   /**
    * Rows returned from SELECT queries
    */
-  rows: any[]
+  rows: TRow[]
 
   /**
    * Number of affected rows (INSERT, UPDATE, DELETE)
@@ -112,12 +124,12 @@ export interface RawQueryResult {
   /**
    * ID of last inserted row (if applicable)
    */
-  insertId?: number | string
+  insertId?: number | string | bigint
 
   /**
    * Additional metadata from the database
    */
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 /**

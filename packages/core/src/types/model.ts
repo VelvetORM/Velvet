@@ -33,7 +33,7 @@ export type ModelCasts = Record<string, CastType>;
 /**
  * Model attributes (raw data)
  */
-export type ModelAttributes<T = any> = Record<string, T>;
+export type ModelAttributes<T = unknown> = Record<string, T>;
 
 /**
  * Model lifecycle events

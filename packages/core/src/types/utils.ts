@@ -29,7 +29,7 @@ export type Awaited<T> = T extends Promise<infer U> ? U : T
 /**
  * Constructor type
  */
-export type Constructor<T = any> = new (...args: any[]) => T
+export type Constructor<T = unknown> = new (...args: unknown[]) => T
 
 /**
  * Extract instance type from constructor
@@ -54,7 +54,7 @@ export type Maybe<T> = T | null | undefined
 /**
  * Plain object type
  */
-export type PlainObject<T = any> = Record<string, T>
+export type PlainObject<T = unknown> = Record<string, T>
 
 /**
  * Primitive types

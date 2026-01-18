@@ -38,7 +38,7 @@ export interface ColumnModifiers {
   /**
    * Set default value
    */
-  default?: any
+  default?: unknown
 
   /**
    * Make column unsigned (numeric only)

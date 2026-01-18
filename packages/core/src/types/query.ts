@@ -1,3 +1,5 @@
+import type { SqlBindings } from './connection'
+
 /**
  * Query Type Definitions
  *
@@ -51,8 +53,8 @@ export interface WhereClause {
   type: 'basic' | 'in' | 'null' | 'between' | 'exists' | 'raw'
   column?: string
   operator?: ComparisonOperator
-  value?: any
-  values?: any[]
+  value?: unknown
+  values?: unknown[]
   boolean: LogicalOperator
   not?: boolean
 }
@@ -80,13 +82,13 @@ export interface OrderByClause {
  * Query bindings
  */
 export interface QueryBindings {
-  select?: any[]
-  from?: any[]
-  join?: any[]
-  where?: any[]
-  having?: any[]
-  order?: any[]
-  union?: any[]
+  select?: unknown[]
+  from?: unknown[]
+  join?: unknown[]
+  where?: unknown[]
+  having?: unknown[]
+  order?: unknown[]
+  union?: unknown[]
 }
 
 /**
@@ -101,7 +103,21 @@ export interface CompiledQuery {
   /**
    * Parameter bindings for prepared statements
    */
-  bindings: any[]
+  bindings: SqlBindings
+}
+
+/**
+ * SELECT query components for compilation
+ */
+export interface SelectComponents {
+  table: string
+  columns?: string[]
+  wheres?: WhereClause[]
+  joins?: JoinClause[]
+  orders?: OrderByClause[]
+  limit?: number
+  offset?: number
+  distinct?: boolean
 }
 
 /**
