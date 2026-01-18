@@ -1,54 +1,81 @@
 /**
  * BelongsToMany Relation
+ *
+ * Represents a many-to-many relationship via a pivot table.
  */
 
-import { Model, type ModelClass } from '../Model'
+import type { ModelBase, ModelBaseConstructor, ModelBaseStatic } from '../contracts/ModelBase'
+import { Collection } from '../support/Collection'
 import type { DatabaseRow } from '../types'
 import { Relation } from './Relation'
 import { Builder } from '../Builder'
+import { Database } from '../Database'
 
-export class BelongsToMany<T extends Model> extends Relation<T> {
-  private pivotTable: string
-  private foreignPivotKey: string
-  private relatedPivotKey: string
-  private relatedKey: string
-  private localKey: string
-  private connectionName: string
-
+/**
+ * BelongsToMany relation
+ *
+ * Example: User belongsToMany Roles
+ */
+export class BelongsToMany<TRelated extends ModelBase = ModelBase> extends Relation<TRelated> {
+  private readonly pivotTable: string
+  private readonly foreignPivotKey: string
+  private readonly relatedPivotKey: string
+  private readonly relatedKey: string
+  private readonly localKey: string
+  private readonly connectionName: string
   constructor(
-    parent: Model,
-    related: ModelClass<T>,
+    parent: ModelBase,
+    parentStatic: ModelBaseStatic,
+    related: ModelBaseConstructor,
     pivotTable?: string,
     foreignPivotKey?: string,
     relatedPivotKey?: string,
     relatedKey?: string,
     localKey?: string
   ) {
-    super(parent, related as ModelClass<T>)
+    super(parent, related)
 
-    const parentTable = (parent.constructor as typeof Model).table
+    const parentTable = parentStatic.table || parentStatic.name.toLowerCase() + 's'
     const relatedTable = this.getRelatedTable()
 
-    this.pivotTable = pivotTable || `${parentTable}_${relatedTable}`
-    this.foreignPivotKey = foreignPivotKey || `${parent.constructor.name.toLowerCase()}_id`
-    this.relatedPivotKey = relatedPivotKey || `${this.related.name.toLowerCase()}_id`
+    this.pivotTable = pivotTable || this.buildPivotTableName(parentTable, relatedTable)
+    this.foreignPivotKey = foreignPivotKey || `${parentStatic.name.toLowerCase()}_id`
+    this.relatedPivotKey = relatedPivotKey || `${related.name.toLowerCase()}_id`
     this.relatedKey = relatedKey || this.getRelatedPrimaryKey()
-    this.localKey = localKey || (parent.constructor as typeof Model).primaryKey
-    this.connectionName = (parent.constructor as typeof Model).connection
+    this.localKey = localKey || parentStatic.primaryKey
+    this.connectionName = parentStatic.connection
+  }
+
+  /**
+   * Build pivot table name from two table names (alphabetically sorted)
+   */
+  private buildPivotTableName(table1: string, table2: string): string {
+    // Convention: alphabetical order, singular form
+    const singular1 = this.singularize(table1)
+    const singular2 = this.singularize(table2)
+    const sorted = [singular1, singular2].sort()
+    return `${sorted[0]}_${sorted[1]}`
+  }
+
+  /**
+   * Simple singularize (removes trailing 's')
+   */
+  private singularize(word: string): string {
+    return word.endsWith('s') ? word.slice(0, -1) : word
   }
 
   /**
    * Get results
    */
-  async get(): Promise<T[]> {
-    const parentId = this.parent.getAttribute(this.localKey)
+  async get(): Promise<Collection<TRelated>> {
+    const parentId = this.getParentAttribute(this.localKey)
     return this.queryRelatedForParents([parentId])
   }
 
   /**
    * Eager load for many parent models
    */
-  async eagerLoadForMany(models: Model[], relationName: string): Promise<void> {
+  async eagerLoadForMany(models: ModelBase[], relationName: string): Promise<void> {
     if (models.length === 0) {
       return
     }
@@ -56,7 +83,7 @@ export class BelongsToMany<T extends Model> extends Relation<T> {
     const ids = models.map((model) => model.getAttribute(this.localKey))
     const related = await this.queryRelatedForParents(ids)
 
-    const relatedMap = new Map<unknown, T>()
+    const relatedMap = new Map<unknown, TRelated>()
     for (const model of related) {
       relatedMap.set(model.getAttribute(this.relatedKey), model)
     }
@@ -68,12 +95,61 @@ export class BelongsToMany<T extends Model> extends Relation<T> {
       const relatedIds = pivotMap.get(id) || []
       const results = relatedIds
         .map((relatedId) => relatedMap.get(relatedId))
-        .filter((item): item is T => Boolean(item))
+        .filter((item): item is TRelated => Boolean(item))
       model.setRelation(relationName, results)
     }
   }
 
-  private async queryRelatedForParents(parentIds: unknown[]): Promise<T[]> {
+  /**
+   * Attach related models
+   */
+  async attach(ids: unknown | unknown[], attributes?: Record<string, unknown>): Promise<void> {
+    const parentId = this.getParentAttribute(this.localKey)
+    const idsArray = Array.isArray(ids) ? ids : [ids]
+
+    for (const relatedId of idsArray) {
+      const pivotData: Record<string, unknown> = {
+        [this.foreignPivotKey]: parentId,
+        [this.relatedPivotKey]: relatedId,
+        ...attributes
+      }
+
+      const columns = Object.keys(pivotData)
+      const placeholders = columns.map(() => '?').join(', ')
+      const columnsList = columns.map((c) => `"${c}"`).join(', ')
+
+      const sql = `INSERT INTO "${this.pivotTable}" (${columnsList}) VALUES (${placeholders})`
+      await Database.insert(sql, Object.values(pivotData), this.connectionName)
+    }
+  }
+
+  /**
+   * Detach related models
+   */
+  async detach(ids?: unknown | unknown[]): Promise<void> {
+    const parentId = this.getParentAttribute(this.localKey)
+
+    if (ids === undefined) {
+      // Detach all
+      const sql = `DELETE FROM "${this.pivotTable}" WHERE "${this.foreignPivotKey}" = ?`
+      await Database.delete(sql, [parentId], this.connectionName)
+    } else {
+      const idsArray = Array.isArray(ids) ? ids : [ids]
+      const placeholders = idsArray.map(() => '?').join(', ')
+      const sql = `DELETE FROM "${this.pivotTable}" WHERE "${this.foreignPivotKey}" = ? AND "${this.relatedPivotKey}" IN (${placeholders})`
+      await Database.delete(sql, [parentId, ...idsArray], this.connectionName)
+    }
+  }
+
+  /**
+   * Sync related models
+   */
+  async sync(ids: unknown[]): Promise<void> {
+    await this.detach()
+    await this.attach(ids)
+  }
+
+  private async queryRelatedForParents(parentIds: unknown[]): Promise<Collection<TRelated>> {
     const pivotRows = await new Builder<DatabaseRow>(this.pivotTable, this.connectionName)
       .whereInColumn(this.foreignPivotKey, parentIds)
       .get()
@@ -81,9 +157,10 @@ export class BelongsToMany<T extends Model> extends Relation<T> {
     const relatedIds = pivotRows
       .map((row) => row[this.relatedPivotKey])
       .filter((id) => id !== null && id !== undefined)
+      .toArray()
 
     if (relatedIds.length === 0) {
-      return []
+      return new Collection<TRelated>()
     }
 
     return this.query().whereInColumn(this.relatedKey, relatedIds).get()

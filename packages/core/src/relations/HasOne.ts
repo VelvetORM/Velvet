@@ -1,54 +1,87 @@
 /**
  * HasOne Relation
+ *
+ * Represents a one-to-one relationship.
  */
 
-import { Model, type ModelClass } from '../Model'
+import type { ModelBase, ModelBaseConstructor, ModelBaseStatic } from '../contracts/ModelBase'
 import { Relation } from './Relation'
 
-export class HasOne<T extends Model> extends Relation<T> {
-  private foreignKey: string
-  private localKey: string
+/**
+ * HasOne relation
+ *
+ * Example: User hasOne Profile
+ */
+export class HasOne<TRelated extends ModelBase = ModelBase> extends Relation<TRelated> {
+  private readonly foreignKey: string
+  private readonly localKey: string
+  private readonly parentStatic: ModelBaseStatic
 
   constructor(
-    parent: Model,
-    related: ModelClass<T>,
+    parent: ModelBase,
+    parentStatic: ModelBaseStatic,
+    related: ModelBaseConstructor,
     foreignKey?: string,
     localKey?: string
   ) {
-    super(parent, related as ModelClass<T>)
+    super(parent, related)
+    this.parentStatic = parentStatic
     this.foreignKey = foreignKey || this.guessForeignKey()
-    this.localKey = localKey || (parent.constructor as typeof Model).primaryKey
+    this.localKey = localKey || parentStatic.primaryKey
   }
 
+  /**
+   * Guess foreign key name based on parent model
+   */
   private guessForeignKey(): string {
-    const parentName = this.parent.constructor.name.toLowerCase()
+    const parentName = this.parentStatic.name.toLowerCase()
     return `${parentName}_id`
   }
 
-  async get(): Promise<T | null> {
-    const parentId = this.parent.getAttribute(this.localKey)
+  /**
+   * Get the related model
+   */
+  async get(): Promise<TRelated | null> {
+    const parentId = this.getParentAttribute(this.localKey)
     return this.query().whereColumn(this.foreignKey, parentId).first()
   }
 
-  async eagerLoadForMany(models: Model[], relationName: string): Promise<void> {
-    if (models.length === 0) {
-      return
+  /**
+   * Create a new related model
+   */
+  async create(attributes: Record<string, unknown>): Promise<TRelated> {
+    const instance = new this.relatedStatic() as TRelated
+    const parentId = this.getParentAttribute(this.localKey)
+
+    for (const [key, value] of Object.entries(attributes)) {
+      instance.setAttribute(key, value)
     }
+    instance.setAttribute(this.foreignKey, parentId)
+
+    await instance.save()
+    return instance
+  }
+
+  /**
+   * Eager load for multiple parent models
+   */
+  async eagerLoadForMany(models: ModelBase[], relationName: string): Promise<void> {
+    if (models.length === 0) return
 
     const ids = models.map((model) => model.getAttribute(this.localKey))
     const results = await this.query().whereInColumn(this.foreignKey, ids).get()
 
-    const grouped = new Map<unknown, T>()
+    // Map by foreign key
+    const resultMap = new Map<unknown, TRelated>()
     for (const result of results) {
       const fk = result.getAttribute(this.foreignKey)
-      if (!grouped.has(fk)) {
-        grouped.set(fk, result)
-      }
+      resultMap.set(fk, result)
     }
 
+    // Assign to each parent
     for (const model of models) {
       const id = model.getAttribute(this.localKey)
-      model.setRelation(relationName, grouped.get(id) || null)
+      model.setRelation(relationName, resultMap.get(id) || null)
     }
   }
 }

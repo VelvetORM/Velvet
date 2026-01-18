@@ -1,40 +1,70 @@
 /**
  * BelongsTo Relation
+ *
+ * Represents an inverse one-to-one or one-to-many relationship.
  */
 
-import { Model, type ModelClass } from '../Model'
+import type { ModelBase, ModelBaseConstructor } from '../contracts/ModelBase'
 import { Relation } from './Relation'
 
-export class BelongsTo<T extends Model> extends Relation<T> {
-  private foreignKey: string
-  private ownerKey: string
+/**
+ * BelongsTo relation
+ *
+ * Example: Post belongsTo User
+ */
+export class BelongsTo<TRelated extends ModelBase = ModelBase> extends Relation<TRelated> {
+  private readonly foreignKey: string
+  private readonly ownerKey: string
 
   constructor(
-    parent: Model,
-    related: ModelClass<T>,
+    parent: ModelBase,
+    related: ModelBaseConstructor,
     foreignKey?: string,
     ownerKey?: string
   ) {
-    super(parent, related as ModelClass<T>)
+    super(parent, related)
     this.foreignKey = foreignKey || this.guessForeignKey()
     this.ownerKey = ownerKey || this.getRelatedPrimaryKey()
   }
 
+  /**
+   * Guess foreign key name based on related model
+   */
   private guessForeignKey(): string {
-    const relatedName = this.related.name.toLowerCase()
+    const relatedName = this.relatedStatic.name.toLowerCase()
     return `${relatedName}_id`
   }
 
-  async get(): Promise<T | null> {
-    const foreignId = this.parent.getAttribute(this.foreignKey)
+  /**
+   * Get the related model
+   */
+  async get(): Promise<TRelated | null> {
+    const foreignId = this.getParentAttribute(this.foreignKey)
     return this.query().whereColumn(this.ownerKey, foreignId).first()
   }
 
-  async eagerLoadForMany(models: Model[], relationName: string): Promise<void> {
-    if (models.length === 0) {
-      return
-    }
+  /**
+   * Associate a model
+   */
+  associate(model: TRelated): void {
+    const ownerValue = model.getAttribute(this.ownerKey)
+    this.parent.setAttribute(this.foreignKey, ownerValue)
+  }
 
+  /**
+   * Dissociate the relation
+   */
+  dissociate(): void {
+    this.parent.setAttribute(this.foreignKey, null)
+  }
+
+  /**
+   * Eager load for multiple parent models
+   */
+  async eagerLoadForMany(models: ModelBase[], relationName: string): Promise<void> {
+    if (models.length === 0) return
+
+    // Collect all foreign key values
     const ids = models
       .map((model) => model.getAttribute(this.foreignKey))
       .filter((id) => id !== null && id !== undefined)
@@ -46,17 +76,20 @@ export class BelongsTo<T extends Model> extends Relation<T> {
       return
     }
 
+    // Query all related models at once
     const results = await this.query().whereInColumn(this.ownerKey, ids).get()
 
-    const grouped = new Map<unknown, T>()
+    // Map by owner key
+    const resultMap = new Map<unknown, TRelated>()
     for (const result of results) {
       const key = result.getAttribute(this.ownerKey)
-      grouped.set(key, result)
+      resultMap.set(key, result)
     }
 
+    // Assign to each parent
     for (const model of models) {
       const foreignId = model.getAttribute(this.foreignKey)
-      model.setRelation(relationName, grouped.get(foreignId) || null)
+      model.setRelation(relationName, resultMap.get(foreignId) || null)
     }
   }
 }
