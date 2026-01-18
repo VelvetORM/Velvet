@@ -20,15 +20,27 @@ export { Schema, Blueprint } from './Schema'
 // ==========================================
 
 export { ConnectionManager } from './connection/ConnectionManager'
+export { ConnectionPool } from './connection/ConnectionPool'
 export { Driver } from './drivers/Driver'
 export { SqliteDriver } from './drivers/sqlite/SqliteDriver'
 export type { DriverContract } from './drivers/contracts/DriverContract'
+
+// ==========================================
+// RELATIONS
+// ==========================================
+
+export { Relation } from './relations/Relation'
+export { HasMany } from './relations/HasMany'
+export { HasOne } from './relations/HasOne'
+export { BelongsTo } from './relations/BelongsTo'
+export { BelongsToMany } from './relations/BelongsToMany'
 
 // ==========================================
 // QUERY GRAMMAR
 // ==========================================
 
 export { Grammar } from './query/grammar/Grammar'
+export { GrammarFactory } from './query/grammar/GrammarFactory'
 export { SqliteGrammar } from './query/grammar/SqliteGrammar'
 
 // ==========================================
