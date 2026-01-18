@@ -38,12 +38,12 @@ export interface ValidationRule {
   /**
    * Allowed values (enum)
    */
-  enum?: any[]
+  enum?: unknown[]
 
   /**
    * Custom validation function
    */
-  validate?: (value: any) => boolean | string
+  validate?: (value: unknown) => boolean | string
 }
 
 /**
@@ -58,7 +58,7 @@ export interface ValidationError {
   field: string
   message: string
   rule: string
-  value?: any
+  value?: unknown
 }
 
 /**
@@ -92,7 +92,7 @@ export class InputValidator {
    * @param rules - Validation rules
    * @returns Array of validation errors (empty if valid)
    */
-  static validate(data: Record<string, any>, rules: ValidationRules): ValidationError[] {
+  static validate(data: Record<string, unknown>, rules: ValidationRules): ValidationError[] {
     const errors: ValidationError[] = []
 
     // Check required fields
@@ -186,7 +186,7 @@ export class InputValidator {
    * @param rules - Validation rules
    * @throws {QueryException} If validation fails
    */
-  static validateOrThrow(data: Record<string, any>, rules: ValidationRules): void {
+  static validateOrThrow(data: Record<string, unknown>, rules: ValidationRules): void {
     const errors = this.validate(data, rules)
 
     if (errors.length > 0) {
@@ -207,7 +207,7 @@ export class InputValidator {
    */
   private static validateType(
     field: string,
-    value: any,
+    value: unknown,
     expectedType: string
   ): ValidationError | null {
     let actualType: string
@@ -239,7 +239,7 @@ export class InputValidator {
    */
   private static validateMin(
     field: string,
-    value: any,
+    value: unknown,
     min: number,
     type?: string
   ): ValidationError | null {
@@ -280,7 +280,7 @@ export class InputValidator {
    */
   private static validateMax(
     field: string,
-    value: any,
+    value: unknown,
     max: number,
     type?: string
   ): ValidationError | null {
