@@ -8,6 +8,8 @@
 import { Database } from "./Database";
 import type { ColumnDefinition, ColumnType, DatabaseRow } from "./types";
 import { QuerySanitizer } from "./support/QuerySanitizer";
+import { SchemaRegistry } from "./schema/SchemaRegistry";
+import { ModelGenerator } from "./schema/ModelGenerator";
 
 /**
  * Column Definition Builder
@@ -337,6 +339,13 @@ export class Blueprint {
 
     return `CREATE TABLE "${safeTableName}" (\n  ${columnDefinitions.join(",\n  ")}\n)`;
   }
+
+  /**
+   * Get a snapshot of column definitions
+   */
+  getColumns(): ReadonlyArray<Partial<ColumnDefinition>> {
+    return [...this.columns];
+  }
 }
 
 /**
@@ -345,6 +354,8 @@ export class Blueprint {
  * Main entry point for schema operations
  */
 export class Schema {
+  private static registry = new SchemaRegistry();
+
   /**
    * Create a new table
    *
@@ -372,6 +383,32 @@ export class Schema {
 
     const sql = blueprint.toSql();
     await Database.raw(sql, [], connectionName);
+    this.registry.register(blueprint);
+  }
+
+  /**
+   * Get a captured blueprint (for model generation)
+   */
+  static getBlueprint(tableName: string): Blueprint | undefined {
+    return this.registry.get(tableName);
+  }
+
+  /**
+   * List captured blueprints
+   */
+  static listBlueprints(): Blueprint[] {
+    return this.registry.list();
+  }
+
+  /**
+   * Generate a model class + attributes interface from a blueprint
+   */
+  static generateModel(tableName: string): string {
+    const blueprint = this.getBlueprint(tableName);
+    if (!blueprint) {
+      throw new Error(`Blueprint not found for table "${tableName}"`);
+    }
+    return ModelGenerator.generateModel(blueprint);
   }
 
   /**

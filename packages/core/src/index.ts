@@ -15,6 +15,8 @@ export type { ModelAttributesOf, ModelStatic, ModelConstructor, ModelClass } fro
 export { Builder } from './Builder'
 export { Database } from './Database'
 export { Schema, Blueprint } from './Schema'
+export { ModelGenerator } from './schema/ModelGenerator'
+export { SchemaRegistry } from './schema/SchemaRegistry'
 
 // ==========================================
 // MODEL COMPONENTS
@@ -32,6 +34,8 @@ export { QueryProxy } from './model/QueryProxy'
 export { Repository } from './model/Repository'
 export { ModelHydrator } from './model/ModelHydrator'
 export { RelationLoader } from './model/RelationLoader'
+export { RelationStore } from './model/concerns/RelationStore'
+export { EventRegistrar } from './model/concerns/EventRegistrar'
 
 // ==========================================
 // CONTRACTS
@@ -51,6 +55,9 @@ export type {
 
 export type { BuilderContract } from './contracts/BuilderContract'
 export type { RelationContract } from './contracts/RelationContract'
+export type { HydratableModel, HydratableModelConstructor } from './contracts/HydratableModel'
+export type { RepositoryContract } from './contracts/RepositoryContract'
+export type { QueryExecutorContract } from './contracts/QueryExecutorContract'
 
 // ==========================================
 // CONNECTION & DRIVERS
