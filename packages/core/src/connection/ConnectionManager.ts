@@ -9,6 +9,7 @@ import type { DatabaseConfig } from '../types'
 import type { DriverContract } from '../drivers/contracts/DriverContract'
 import { SqliteDriver } from '../drivers/sqlite/SqliteDriver'
 import { ConnectionException } from '../exceptions'
+import { ConnectionPool } from './ConnectionPool'
 
 /**
  * Connection Manager
@@ -37,6 +38,7 @@ export class ConnectionManager {
    * @private
    */
   private static connections: Map<string, DriverContract> = new Map()
+  private static pools: Map<string, ConnectionPool<DriverContract>> = new Map()
 
   /**
    * Default connection name
@@ -67,6 +69,23 @@ export class ConnectionManager {
   static addConnection(name: string, config: DatabaseConfig): DriverContract {
     const driver = this.createDriver(config)
     this.connections.set(name, driver)
+
+    if (config.pool) {
+      const pool = new ConnectionPool<DriverContract>(
+        config.pool,
+        async () => {
+          const pooledDriver = this.createDriver(config)
+          await pooledDriver.connect()
+          return pooledDriver
+        },
+        async (resource) => {
+          if (resource.isConnected()) {
+            await resource.disconnect()
+          }
+        }
+      )
+      this.pools.set(name, pool)
+    }
 
     // Set as default if it's the first connection or explicitly named 'default'
     if (this.connections.size === 1 || name === 'default') {
@@ -139,6 +158,7 @@ export class ConnectionManager {
    */
   static async removeConnection(name: string): Promise<void> {
     const connection = this.connections.get(name)
+    const pool = this.pools.get(name)
 
     if (connection) {
       if (connection.isConnected()) {
@@ -152,6 +172,11 @@ export class ConnectionManager {
         const firstKey = this.connections.keys().next().value
         this.defaultConnectionName = firstKey || 'default'
       }
+    }
+
+    if (pool) {
+      await pool.drain()
+      this.pools.delete(name)
     }
   }
 
@@ -177,6 +202,12 @@ export class ConnectionManager {
 
     await Promise.all(disconnectPromises)
     this.connections.clear()
+
+    const drainPromises = Array.from(this.pools.values()).map(async (pool) => {
+      await pool.drain()
+    })
+    await Promise.all(drainPromises)
+    this.pools.clear()
     this.defaultConnectionName = 'default'
   }
 
@@ -202,6 +233,26 @@ export class ConnectionManager {
    */
   static getDefaultConnectionName(): string {
     return this.defaultConnectionName
+  }
+
+  /**
+   * Get a connection pool by name
+   *
+   * @param name - Connection name (uses default if not specified)
+   * @returns Pool instance
+   */
+  static pool(name?: string): ConnectionPool<DriverContract> {
+    const connectionName = name || this.defaultConnectionName
+    const pool = this.pools.get(connectionName)
+
+    if (!pool) {
+      throw new ConnectionException(
+        `Connection pool [${connectionName}] not found`,
+        'POOL_NOT_FOUND'
+      )
+    }
+
+    return pool
   }
 
   /**
@@ -275,6 +326,7 @@ export class ConnectionManager {
    */
   static purge(): void {
     this.connections.clear()
+    this.pools.clear()
     this.defaultConnectionName = 'default'
   }
 }
