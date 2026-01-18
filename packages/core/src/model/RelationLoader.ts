@@ -18,7 +18,7 @@ export class RelationLoader {
 
     for (const [relationName, nested] of Object.entries(tree)) {
       const first = models[0]
-      const relationMethod = (first as unknown as Record<string, unknown>)[relationName]
+      const relationMethod = Reflect.get(first as object, relationName)
 
       if (typeof relationMethod !== 'function') {
         throw new Error(`Relation ${relationName} does not exist on ${first.constructor.name}`)

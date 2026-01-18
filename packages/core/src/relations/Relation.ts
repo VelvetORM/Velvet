@@ -6,7 +6,14 @@
  */
 
 import type { ModelBase, ModelBaseConstructor } from '../contracts/ModelBase'
-import type { Model, ModelClass } from '../Model'
+import type { ModelConstructor } from '../Model'
+
+const isModelConstructor = (
+  value: ModelBaseConstructor
+): value is ModelConstructor => {
+  const proto = (value as unknown as { prototype?: Record<string, unknown> }).prototype
+  return Boolean(proto && typeof proto.setRawAttributes === 'function')
+}
 import { Builder } from '../Builder'
 
 /**
@@ -30,10 +37,16 @@ export abstract class Relation<TRelated extends ModelBase = ModelBase> {
   protected query(): Builder<TRelated> {
     // Relations use Builder with the related model's table and connection
     // The Builder will handle hydration when executed with a ModelClass
-    return new Builder<TRelated>(
+    const builder = new Builder<TRelated>(
       this.relatedStatic.table || this.relatedStatic.name.toLowerCase() + 's',
       this.relatedStatic.connection
-    ).setModelClass(this.relatedStatic as unknown as ModelClass<Model>)
+    )
+
+    if (isModelConstructor(this.relatedStatic)) {
+      builder.setModelClass(this.relatedStatic)
+    }
+
+    return builder
   }
 
   /**

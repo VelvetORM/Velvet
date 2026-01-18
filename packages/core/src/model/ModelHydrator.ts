@@ -5,12 +5,12 @@
  */
 
 import type { DatabaseRow } from '../types'
-import type { Model, ModelClass } from '../Model'
+import type { Model, ModelConstructor } from '../Model'
 
 export class ModelHydrator<T = unknown> {
-  private readonly model?: ModelClass<Model>
+  private readonly model?: ModelConstructor<Model>
 
-  constructor(model?: ModelClass<Model>) {
+  constructor(model?: ModelConstructor<Model>) {
     this.model = model
   }
 

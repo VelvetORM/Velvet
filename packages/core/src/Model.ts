@@ -55,13 +55,38 @@ export interface ModelStatic {
  * Constructor type for Model subclasses
  */
 export type ModelConstructor<T extends Model = Model> =
-  (new (attributes?: Partial<Attributes>) => T) & typeof Model
+  (new (attributes?: Partial<Attributes>) => T) &
+  ModelStatic & {
+    find(id: string | number): Promise<T | null>
+    queryProxy(): QueryProxy<T>
+    repository(): Repository<T>
+    repo(): Repository<T>
+  }
 
 /**
  * Model class type with static properties
  */
-export type ModelClass<T extends Model = Model> =
-  (new (attributes?: Partial<Attributes>) => T) & ModelStatic
+export type ModelClass<T extends Model = Model> = ModelConstructor<T>
+
+const isModelBaseStatic = (value: unknown): value is ModelBaseStatic => {
+  if (typeof value !== 'function') return false
+  const record = value as unknown as {
+    table?: unknown
+    primaryKey?: unknown
+    connection?: unknown
+  }
+  return (
+    typeof record.table === 'string' &&
+    typeof record.primaryKey === 'string' &&
+    typeof record.connection === 'string'
+  )
+}
+
+const isModelConstructor = (value: unknown): value is ModelConstructor<Model> => {
+  if (!isModelBaseStatic(value)) return false
+  const record = value as unknown as { find?: unknown }
+  return typeof record.find === 'function'
+}
 
 // ==========================================
 // BASE MODEL CLASS
@@ -204,7 +229,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
    * Begin a new query
    */
   static query<T extends Model>(this: ModelConstructor<T>): Builder<T> {
-    return this.queryProxy<T>().query()
+    return this.queryProxy().query()
   }
 
   /**
@@ -228,9 +253,9 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     value?: unknown
   ): Builder<T> {
     if (arguments.length === 2) {
-      return this.queryProxy<T>().where(column, operatorOrValue)
+      return this.queryProxy().where(column, operatorOrValue)
     }
-    return this.queryProxy<T>().where(column, operatorOrValue as ComparisonOperator, value)
+    return this.queryProxy().where(column, operatorOrValue as ComparisonOperator, value)
   }
 
   /**
@@ -240,7 +265,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     this: ModelConstructor<T>,
     id: string | number
   ): Promise<T | null> {
-    return this.queryProxy<T>().find(id)
+    return this.queryProxy().find(id)
   }
 
   /**
@@ -250,28 +275,28 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     this: ModelConstructor<T>,
     id: string | number
   ): Promise<T> {
-    return this.queryProxy<T>().findOrFail(id)
+    return this.queryProxy().findOrFail(id)
   }
 
   /**
    * Get the first model
    */
   static async first<T extends Model>(this: ModelConstructor<T>): Promise<T | null> {
-    return this.queryProxy<T>().first()
+    return this.queryProxy().first()
   }
 
   /**
    * Get all models
    */
   static async all<T extends Model>(this: ModelConstructor<T>): Promise<Collection<T>> {
-    return this.queryProxy<T>().all()
+    return this.queryProxy().all()
   }
 
   /**
    * Alias for all()
    */
   static async get<T extends Model>(this: ModelConstructor<T>): Promise<Collection<T>> {
-    return this.queryProxy<T>().get()
+    return this.queryProxy().get()
   }
 
   /**
@@ -281,14 +306,14 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     this: ModelConstructor<T>,
     attributes: Partial<Attributes>
   ): Promise<T> {
-    return this.queryProxy<T>().create(attributes)
+    return this.queryProxy().create(attributes)
   }
 
   /**
    * Eager load relationships
    */
   static with<T extends Model>(this: ModelConstructor<T>, ...relations: string[]): Builder<T> {
-    return this.queryProxy<T>().with(...relations)
+    return this.queryProxy().with(...relations)
   }
 
   /**
@@ -299,56 +324,56 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     column: string,
     direction?: 'asc' | 'desc'
   ): Builder<T> {
-    return this.queryProxy<T>().orderBy(column, direction)
+    return this.queryProxy().orderBy(column, direction)
   }
 
   /**
    * Order by created_at DESC
    */
   static latest<T extends Model>(this: ModelConstructor<T>, column?: string): Builder<T> {
-    return this.queryProxy<T>().latest(column)
+    return this.queryProxy().latest(column)
   }
 
   /**
    * Order by created_at ASC
    */
   static oldest<T extends Model>(this: ModelConstructor<T>, column?: string): Builder<T> {
-    return this.queryProxy<T>().oldest(column)
+    return this.queryProxy().oldest(column)
   }
 
   /**
    * Limit results
    */
   static limit<T extends Model>(this: ModelConstructor<T>, value: number): Builder<T> {
-    return this.queryProxy<T>().limit(value)
+    return this.queryProxy().limit(value)
   }
 
   /**
    * Alias for limit
    */
   static take<T extends Model>(this: ModelConstructor<T>, value: number): Builder<T> {
-    return this.queryProxy<T>().take(value)
+    return this.queryProxy().take(value)
   }
 
   /**
    * Count models
    */
   static async count<T extends Model>(this: ModelConstructor<T>): Promise<number> {
-    return this.queryProxy<T>().count()
+    return this.queryProxy().count()
   }
 
   /**
    * Include soft deleted
    */
   static withTrashed<T extends Model>(this: ModelConstructor<T>): Builder<T> {
-    return this.queryProxy<T>().withTrashed()
+    return this.queryProxy().withTrashed()
   }
 
   /**
    * Only soft deleted
    */
   static onlyTrashed<T extends Model>(this: ModelConstructor<T>): Builder<T> {
-    return this.queryProxy<T>().onlyTrashed()
+    return this.queryProxy().onlyTrashed()
   }
 
   /**
@@ -359,7 +384,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     name: string,
     ...args: unknown[]
   ): Builder<T> {
-    return this.queryProxy<T>().scope(name, ...args)
+    return this.queryProxy().scope(name, ...args)
   }
 
   /**
@@ -380,7 +405,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
    * Alias for repository()
    */
   static repo<T extends Model>(this: ModelConstructor<T>): Repository<T> {
-    return this.repository<T>()
+    return this.repository()
   }
 
   // ==========================================
@@ -392,7 +417,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     foreignKey?: string,
     localKey?: string
   ): HasMany<T> {
-    const parentStatic = this.constructor as unknown as ModelBaseStatic
+    const parentStatic = this.getModelBaseStatic()
     return new HasMany<T>(this, parentStatic, related, foreignKey, localKey)
   }
 
@@ -401,7 +426,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     foreignKey?: string,
     localKey?: string
   ): HasOne<T> {
-    const parentStatic = this.constructor as unknown as ModelBaseStatic
+    const parentStatic = this.getModelBaseStatic()
     return new HasOne<T>(this, parentStatic, related, foreignKey, localKey)
   }
 
@@ -421,7 +446,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     relatedKey?: string,
     localKey?: string
   ): BelongsToMany<T> {
-    const parentStatic = this.constructor as unknown as ModelBaseStatic
+    const parentStatic = this.getModelBaseStatic()
     return new BelongsToMany<T>(
       this, parentStatic, related, pivotTable,
       foreignPivotKey, relatedPivotKey, relatedKey, localKey
@@ -566,7 +591,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     const config = this.getConfig()
     const id = this.getAttribute(config.primaryKey as keyof TAttributes)
 
-    const fresh = await (this.constructor as unknown as ModelConstructor<Model>).find(id as string | number)
+    const fresh = await this.getModelConstructor().find(id as string | number)
     if (!fresh) {
       throw new Error('Model not found during refresh')
     }
@@ -695,12 +720,12 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
    */
   private buildMutators(): MutatorRegistry {
     const mutators: MutatorRegistry = {}
-    const proto = Object.getPrototypeOf(this) as Record<string, unknown>
+    const proto = Object.getPrototypeOf(this)
 
     for (const key of Object.getOwnPropertyNames(proto)) {
       if (key.startsWith('set') && key.endsWith('Attribute') && key.length > 12) {
         const attrName = this.snakeCase(key.slice(3, -9))
-        const method = proto[key]
+        const method = Reflect.get(proto, key)
         if (typeof method === 'function') {
           mutators[attrName] = method.bind(this) as (value: unknown) => unknown
         }
@@ -715,12 +740,12 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
    */
   private buildAccessors(): AccessorRegistry {
     const accessors: AccessorRegistry = {}
-    const proto = Object.getPrototypeOf(this) as Record<string, unknown>
+    const proto = Object.getPrototypeOf(this)
 
     for (const key of Object.getOwnPropertyNames(proto)) {
       if (key.startsWith('get') && key.endsWith('Attribute') && key.length > 12) {
         const attrName = this.snakeCase(key.slice(3, -9))
-        const method = proto[key]
+        const method = Reflect.get(proto, key)
         if (typeof method === 'function') {
           accessors[attrName] = method.bind(this) as (value: unknown) => unknown
         }
@@ -741,7 +766,7 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
     ]
 
     for (const event of eventMethods) {
-      const method = (this as Record<string, unknown>)[event]
+      const method = Reflect.get(this, event)
       if (typeof method === 'function') {
         this.events.on(event, method.bind(this) as () => void | Promise<void>)
       }
@@ -754,6 +779,26 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
 
   protected validateAttributes(attributes: Record<string, unknown>, requireAll: boolean): void {
     this.validator.validate(attributes, requireAll)
+  }
+
+  // ==========================================
+  // INTERNAL TYPE HELPERS
+  // ==========================================
+
+  protected getModelBaseStatic(): ModelBaseStatic {
+    const ctor = this.constructor
+    if (isModelBaseStatic(ctor)) {
+      return ctor
+    }
+    throw new Error('Invalid model constructor')
+  }
+
+  protected getModelConstructor(): ModelConstructor<Model> {
+    const ctor = this.constructor
+    if (isModelConstructor(ctor)) {
+      return ctor
+    }
+    throw new Error('Invalid model constructor')
   }
 
   // ==========================================

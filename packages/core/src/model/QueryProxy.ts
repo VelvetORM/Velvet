@@ -9,7 +9,7 @@ import { Builder } from '../Builder'
 import { Collection } from '../support/Collection'
 import type { Attributes } from '../contracts/ModelContract'
 import type { ComparisonOperator } from '../types'
-import type { Model, ModelClass, ModelConstructor } from '../Model'
+import type { Model, ModelConstructor } from '../Model'
 
 export class QueryProxy<T extends Model = Model> {
   private readonly modelClass: ModelConstructor<T>
@@ -19,7 +19,7 @@ export class QueryProxy<T extends Model = Model> {
   }
 
   query(): Builder<T> {
-    return new Builder<T>(this.modelClass as unknown as ModelClass<T>, this.modelClass.connection)
+    return new Builder<T>(this.modelClass, this.modelClass.connection)
   }
 
   where(column: string, value: unknown): Builder<T>
@@ -110,8 +110,8 @@ export class QueryProxy<T extends Model = Model> {
     const query = this.query()
     const methodName = `scope${name.charAt(0).toUpperCase()}${name.slice(1)}`
 
-    const proto = this.modelClass.prototype as unknown as Record<string, unknown>
-    const scopeMethod = proto[methodName]
+    const proto = this.modelClass.prototype
+    const scopeMethod = Reflect.get(proto, methodName)
 
     if (typeof scopeMethod !== 'function') {
       throw new Error(`Scope '${name}' does not exist on ${this.modelClass.name}`)
