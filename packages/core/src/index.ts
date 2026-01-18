@@ -11,9 +11,46 @@
 // ==========================================
 
 export { Model } from './Model'
+export type { ModelAttributesOf, ModelStatic, ModelConstructor, ModelClass } from './Model'
 export { Builder } from './Builder'
 export { Database } from './Database'
 export { Schema, Blueprint } from './Schema'
+
+// ==========================================
+// MODEL COMPONENTS
+// ==========================================
+
+export { AttributeBag } from './model/AttributeBag'
+export type { CastMap, MutatorRegistry, AccessorRegistry, AttributeBagConfig } from './model/AttributeBag'
+export { ModelSerializer } from './model/ModelSerializer'
+export type { Serializable, SerializationOptions } from './model/ModelSerializer'
+export { ModelEventDispatcher, ModelEvents } from './model/ModelEventDispatcher'
+export type { EventPriority, EventDispatchResult } from './model/ModelEventDispatcher'
+export { ModelPersister } from './model/ModelPersister'
+export { ModelValidator } from './model/ModelValidator'
+export { QueryProxy } from './model/QueryProxy'
+export { Repository } from './model/Repository'
+export { ModelHydrator } from './model/ModelHydrator'
+export { RelationLoader } from './model/RelationLoader'
+
+// ==========================================
+// CONTRACTS
+// ==========================================
+
+export type {
+  Attributes,
+  CastType,
+  ModelConfiguration,
+  ModelEvent,
+  ModelEventHandler,
+  AttributeMutator,
+  AttributeAccessor,
+  ModelContract,
+  ModelStaticContract
+} from './contracts/ModelContract'
+
+export type { BuilderContract } from './contracts/BuilderContract'
+export type { RelationContract } from './contracts/RelationContract'
 
 // ==========================================
 // CONNECTION & DRIVERS
@@ -42,12 +79,19 @@ export { BelongsToMany } from './relations/BelongsToMany'
 export { Grammar } from './query/grammar/Grammar'
 export { GrammarFactory } from './query/grammar/GrammarFactory'
 export { SqliteGrammar } from './query/grammar/SqliteGrammar'
+export { QueryCompiler } from './query/QueryCompiler'
 
 // ==========================================
 // TYPES
 // ==========================================
 
 export type * from './types'
+
+// ==========================================
+// SUPPORT
+// ==========================================
+
+export { Collection } from './support/Collection'
 
 // ==========================================
 // EXCEPTIONS
