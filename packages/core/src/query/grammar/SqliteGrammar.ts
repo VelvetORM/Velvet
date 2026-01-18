@@ -5,7 +5,7 @@
  */
 
 import { Grammar } from './Grammar'
-import type { CompiledQuery, WhereClause } from '../../types'
+import type { CompiledQuery, SelectComponents, WhereClause } from '../../types'
 import { QuerySanitizer } from '../../support/QuerySanitizer'
 
 /**
@@ -28,16 +28,7 @@ export class SqliteGrammar extends Grammar {
   /**
    * Compile a SELECT statement
    */
-  compileSelect(components: {
-    table: string
-    columns?: string[]
-    wheres?: WhereClause[]
-    joins?: any[]
-    orders?: any[]
-    limit?: number
-    offset?: number
-    distinct?: boolean
-  }): CompiledQuery {
+  compileSelect(components: SelectComponents): CompiledQuery {
     let cacheKey: string | undefined
     if (this.cachingEnabled) {
       cacheKey = this.getCompilationCacheKey(components)
@@ -47,7 +38,7 @@ export class SqliteGrammar extends Grammar {
       }
     }
 
-    const bindings: any[] = []
+    const bindings: unknown[] = []
     const parts: string[] = []
 
     // SELECT
@@ -102,7 +93,7 @@ export class SqliteGrammar extends Grammar {
   /**
    * Compile an INSERT statement
    */
-  compileInsert(table: string, values: Record<string, any>): CompiledQuery {
+  compileInsert(table: string, values: Record<string, unknown>): CompiledQuery {
     const columns = Object.keys(values)
     const bindings = Object.values(values)
 
@@ -119,10 +110,10 @@ export class SqliteGrammar extends Grammar {
    */
   compileUpdate(
     table: string,
-    values: Record<string, any>,
+    values: Record<string, unknown>,
     wheres: WhereClause[]
   ): CompiledQuery {
-    const bindings: any[] = []
+    const bindings: unknown[] = []
 
     // SET clause
     const sets = Object.entries(values).map(([column, value]) => {
@@ -150,7 +141,7 @@ export class SqliteGrammar extends Grammar {
    * Compile a DELETE statement
    */
   compileDelete(table: string, wheres: WhereClause[]): CompiledQuery {
-    const bindings: any[] = []
+    const bindings: unknown[] = []
 
     const parts = [`DELETE FROM ${this.wrap(table)}`]
 

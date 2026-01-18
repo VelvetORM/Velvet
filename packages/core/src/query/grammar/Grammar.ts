@@ -9,7 +9,8 @@ import type {
   WhereClause,
   JoinClause,
   OrderByClause,
-  CompiledQuery
+  CompiledQuery,
+  SelectComponents
 } from '../../types'
 import { QuerySanitizer } from '../../support/QuerySanitizer'
 import { LRUCache } from '../../support/LRUCache'
@@ -86,7 +87,7 @@ export abstract class Grammar {
    * @param builder - Query builder components
    * @returns Compiled SQL with bindings
    */
-  abstract compileSelect(builder: any): CompiledQuery
+  abstract compileSelect(builder: SelectComponents): CompiledQuery
 
   /**
    * Compile an INSERT statement
@@ -95,7 +96,7 @@ export abstract class Grammar {
    * @param values - Values to insert
    * @returns Compiled SQL with bindings
    */
-  abstract compileInsert(table: string, values: Record<string, any>): CompiledQuery
+  abstract compileInsert(table: string, values: Record<string, unknown>): CompiledQuery
 
   /**
    * Compile an UPDATE statement
@@ -107,7 +108,7 @@ export abstract class Grammar {
    */
   abstract compileUpdate(
     table: string,
-    values: Record<string, any>,
+    values: Record<string, unknown>,
     wheres: WhereClause[]
   ): CompiledQuery
 
@@ -150,7 +151,7 @@ export abstract class Grammar {
    * @param bindings - Bindings array to append to
    * @returns SQL string
    */
-  protected compileWheres(wheres: WhereClause[], bindings: any[]): string {
+  protected compileWheres(wheres: WhereClause[], bindings: unknown[]): string {
     if (wheres.length === 0) {
       return ''
     }
@@ -185,7 +186,7 @@ export abstract class Grammar {
   /**
    * Compile a basic WHERE clause
    */
-  protected compileBasicWhere(where: WhereClause, bindings: any[], prefix: string): string {
+  protected compileBasicWhere(where: WhereClause, bindings: unknown[], prefix: string): string {
     bindings.push(where.value)
     const not = where.not ? 'NOT ' : ''
     return `${prefix} ${not}${this.wrap(where.column!)} ${where.operator} ${this.getParameterPlaceholder(bindings.length)}`
@@ -194,7 +195,7 @@ export abstract class Grammar {
   /**
    * Compile an IN WHERE clause
    */
-  protected compileInWhere(where: WhereClause, bindings: any[], prefix: string): string {
+  protected compileInWhere(where: WhereClause, bindings: unknown[], prefix: string): string {
     const placeholders = where.values!.map((value) => {
       bindings.push(value)
       return this.getParameterPlaceholder(bindings.length)
@@ -215,7 +216,7 @@ export abstract class Grammar {
   /**
    * Compile a BETWEEN WHERE clause
    */
-  protected compileBetweenWhere(where: WhereClause, bindings: any[], prefix: string): string {
+  protected compileBetweenWhere(where: WhereClause, bindings: unknown[], prefix: string): string {
     const [min, max] = where.values!
     bindings.push(min, max)
 
@@ -229,7 +230,7 @@ export abstract class Grammar {
   /**
    * Compile a raw WHERE clause
    */
-  protected compileRawWhere(where: WhereClause, bindings: any[], prefix: string): string {
+  protected compileRawWhere(where: WhereClause, bindings: unknown[], prefix: string): string {
     if (where.values) {
       bindings.push(...where.values)
     }
