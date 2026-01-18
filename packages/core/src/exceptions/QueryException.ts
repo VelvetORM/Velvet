@@ -1,4 +1,5 @@
 import { VelvetException } from './VelvetException'
+import type { SqlBindings } from '../types'
 
 /**
  * Query Exception
@@ -23,14 +24,14 @@ export class QueryException extends VelvetException {
   /**
    * Query bindings/parameters
    */
-  public bindings?: any[]
+  public bindings?: SqlBindings
 
   constructor(
     message: string,
     sql?: string,
-    bindings?: any[],
+    bindings?: SqlBindings,
     code?: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ) {
     super(message, code || 'QUERY_ERROR', context)
     this.sql = sql

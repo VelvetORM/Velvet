@@ -15,7 +15,7 @@ import { VelvetException } from './VelvetException'
  * ```
  */
 export class ConnectionException extends VelvetException {
-  constructor(message: string, code?: string, context?: Record<string, any>) {
+  constructor(message: string, code?: string, context?: Record<string, unknown>) {
     super(message, code || 'CONNECTION_ERROR', context)
   }
 }

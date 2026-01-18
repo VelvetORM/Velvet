@@ -13,7 +13,7 @@ export class VelvetException extends Error {
   /**
    * Additional context data
    */
-  public context?: Record<string, any>
+  public context?: Record<string, unknown>
 
   /**
    * Create a new Velvet exception
@@ -31,15 +31,18 @@ export class VelvetException extends Error {
    * )
    * ```
    */
-  constructor(message: string, code?: string, context?: Record<string, any>) {
+  constructor(message: string, code?: string, context?: Record<string, unknown>) {
     super(message)
     this.name = this.constructor.name
     this.code = code
     this.context = context
 
     // Maintains proper stack trace for where error was thrown (V8 only)
-    if (typeof (Error as any).captureStackTrace === 'function') {
-      ;(Error as any).captureStackTrace(this, this.constructor)
+    const captureStackTrace = (Error as ErrorConstructor & {
+      captureStackTrace?: (target: object, ctor?: Function) => void
+    }).captureStackTrace
+    if (typeof captureStackTrace === 'function') {
+      captureStackTrace(this, this.constructor)
     }
   }
 
