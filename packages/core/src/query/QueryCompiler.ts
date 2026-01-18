@@ -26,15 +26,23 @@ export interface SoftDeleteConfig {
 
 export class QueryCompiler {
   private readonly grammar: Grammar
+  private readonly cache: Map<string, { sql: string; bindings: unknown[] }>
 
   constructor(grammar: Grammar) {
     this.grammar = grammar
+    this.cache = new Map()
   }
 
   compileSelect(
     components: QueryComponents,
     softDelete?: SoftDeleteConfig
   ): { sql: string; bindings: unknown[] } {
+    const cacheKey = this.getCacheKey(components, softDelete)
+    const cached = this.cache.get(cacheKey)
+    if (cached) {
+      return cached
+    }
+
     const wheres = [...(components.wheres ?? [])]
 
     if (softDelete?.column) {
@@ -54,9 +62,31 @@ export class QueryCompiler {
       }
     }
 
-    return this.grammar.compileSelect({
+    const compiled = this.grammar.compileSelect({
       ...components,
       wheres: wheres.length > 0 ? wheres : undefined
     })
+
+    this.cache.set(cacheKey, compiled)
+    return compiled
+  }
+
+  private getCacheKey(
+    components: QueryComponents,
+    softDelete?: SoftDeleteConfig
+  ): string {
+    const base = {
+      table: components.table,
+      columns: components.columns ?? [],
+      wheres: components.wheres ?? [],
+      joins: components.joins ?? [],
+      orders: components.orders ?? [],
+      limit: components.limit ?? null,
+      offset: components.offset ?? null,
+      distinct: components.distinct ?? false,
+      softDelete: softDelete ?? null
+    }
+
+    return JSON.stringify(base)
   }
 }
