@@ -29,6 +29,12 @@ export type MutatorRegistry = Record<string, (value: unknown) => unknown>
 export type AccessorRegistry = Record<string, (value: unknown) => unknown>
 
 /**
+ * Internal type for writable record.
+ * Used by helper methods to centralize type assertions.
+ */
+type WritableRecord = Record<string, unknown>
+
+/**
  * AttributeBag configuration
  */
 export interface AttributeBagConfig {
@@ -89,6 +95,18 @@ export class AttributeBag<TAttributes extends Attributes = Attributes> {
     this.casts = config.casts ?? {}
     this.mutators = config.mutators ?? {}
     this.accessors = config.accessors ?? {}
+  }
+
+  // ==========================================
+  // PRIVATE HELPERS (centralized type casts)
+  // ==========================================
+
+  /**
+   * Get current attributes as writable record.
+   * Centralizes the type assertion for dynamic property access.
+   */
+  private asWritable(): WritableRecord {
+    return this.current as WritableRecord
   }
 
   // ==========================================
@@ -172,8 +190,8 @@ export class AttributeBag<TAttributes extends Attributes = Attributes> {
       value = mutator(value)
     }
 
-    // Set the value
-    ;(this.current as Record<string, unknown>)[key] = value
+    // Set the value using centralized helper
+    this.asWritable()[key] = value
 
     // Track dirty state
     this.updateDirtyState(key)
@@ -185,7 +203,7 @@ export class AttributeBag<TAttributes extends Attributes = Attributes> {
   setRaw<K extends keyof TAttributes>(key: K, value: TAttributes[K]): void
   setRaw(key: string, value: unknown): void
   setRaw(key: string, value: unknown): void {
-    ;(this.current as Record<string, unknown>)[key] = value
+    this.asWritable()[key] = value
     this.updateDirtyState(key)
   }
 
@@ -236,11 +254,12 @@ export class AttributeBag<TAttributes extends Attributes = Attributes> {
    * Get all dirty attributes
    */
   getDirty(): Partial<TAttributes> {
-    const dirty: Partial<TAttributes> = {}
+    const dirty: WritableRecord = {}
+    const current = this.asWritable()
     for (const key of this.dirty) {
-      ;(dirty as Record<string, unknown>)[key] = this.current[key]
+      dirty[key] = current[key]
     }
-    return dirty
+    return dirty as Partial<TAttributes>
   }
 
   /**

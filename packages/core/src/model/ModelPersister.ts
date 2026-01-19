@@ -3,10 +3,11 @@
  *
  * Handles persistence and SQL generation for a model.
  * Keeps Model focused on behavior and coordination.
+ * Uses injectable connection resolver for testability.
  */
 
 import type { Attributes, ModelConfiguration } from '../contracts/ModelContract'
-import { Database } from '../Database'
+import { resolveConnection } from '../testing/ConnectionResolver'
 import { GrammarFactory } from '../query/grammar/GrammarFactory'
 import type { WhereClause } from '../types'
 import type { AttributeBag } from './AttributeBag'
@@ -29,7 +30,8 @@ export class ModelPersister<TAttributes extends Attributes = Attributes> {
 
     const grammar = GrammarFactory.create(config.connection)
     const compiled = grammar.compileInsert(config.table, attributes)
-    return Database.insert(compiled.sql, compiled.bindings, config.connection)
+    const connection = resolveConnection(config.connection)
+    return connection.insert(compiled.sql, compiled.bindings)
   }
 
   async update(primaryKeyValue: unknown): Promise<number> {
@@ -49,7 +51,8 @@ export class ModelPersister<TAttributes extends Attributes = Attributes> {
       boolean: 'AND'
     }]
     const compiled = grammar.compileUpdate(config.table, attributes, wheres)
-    return Database.update(compiled.sql, compiled.bindings, config.connection)
+    const connection = resolveConnection(config.connection)
+    return connection.update(compiled.sql, compiled.bindings)
   }
 
   async delete(primaryKeyValue: unknown): Promise<number> {
@@ -64,7 +67,8 @@ export class ModelPersister<TAttributes extends Attributes = Attributes> {
       boolean: 'AND'
     }]
     const compiled = grammar.compileDelete(config.table, wheres)
-    return Database.delete(compiled.sql, compiled.bindings, config.connection)
+    const connection = resolveConnection(config.connection)
+    return connection.delete(compiled.sql, compiled.bindings)
   }
 
   private getInsertAttributes(config: ModelConfiguration): Record<string, unknown> {
