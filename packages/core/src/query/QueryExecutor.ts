@@ -1,10 +1,11 @@
 /**
  * QueryExecutor
  *
- * Executes compiled queries via Database facade.
+ * Executes compiled queries via connection resolver.
+ * Uses the injectable resolver for testability.
  */
 
-import { Database } from '../Database'
+import { resolveConnection } from '../testing/ConnectionResolver'
 import type { DatabaseRow } from '../types'
 import type { QueryExecutorContract } from '../contracts/QueryExecutorContract'
 
@@ -19,6 +20,7 @@ export class QueryExecutor implements QueryExecutorContract {
     sql: string,
     bindings: unknown[]
   ): Promise<TRow[]> {
-    return Database.select<TRow>(sql, bindings, this.connectionName)
+    const connection = resolveConnection(this.connectionName)
+    return connection.select<TRow>(sql, bindings)
   }
 }
