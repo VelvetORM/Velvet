@@ -156,7 +156,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * ```
    */
   distinct(): this {
-    this.state.distinctFlag = true
+    this.state.distinct = true
     return this
   }
 
@@ -434,7 +434,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * Set LIMIT
    */
   limit(value: number): this {
-    this.state.limitValue = value
+    this.state.limit = value
     return this
   }
 
@@ -449,7 +449,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    * Set OFFSET
    */
   offset(value: number): this {
-    this.state.offsetValue = value
+    this.state.offset = value
     return this
   }
 
@@ -641,7 +641,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    */
   withTrashed(): this {
     this.state.includeTrashed = true
-    this.state.onlyTrashedFlag = false
+    this.state.onlyTrashed = false
     return this
   }
 
@@ -650,7 +650,7 @@ export class Builder<T = unknown> implements BuilderContract<T> {
    */
   onlyTrashed(): this {
     this.state.includeTrashed = true
-    this.state.onlyTrashedFlag = true
+    this.state.onlyTrashed = true
     return this
   }
 
@@ -672,14 +672,14 @@ export class Builder<T = unknown> implements BuilderContract<T> {
         wheres: this.state.wheres.length > 0 ? this.state.wheres : undefined,
         joins: this.state.joins.length > 0 ? this.state.joins : undefined,
         orders: this.state.orders.length > 0 ? this.state.orders : undefined,
-        limit: this.state.limitValue,
-        offset: this.state.offsetValue,
-        distinct: this.state.distinctFlag
+        limit: this.state.limit,
+        offset: this.state.offset,
+        distinct: this.state.distinct
       },
       {
         column: this.state.softDeleteColumn,
         includeTrashed: this.state.includeTrashed,
-        onlyTrashed: this.state.onlyTrashedFlag
+        onlyTrashed: this.state.onlyTrashed
       }
     )
   }
