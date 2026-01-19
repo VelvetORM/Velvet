@@ -3,12 +3,15 @@
  *
  * Encapsulates static query behavior for a Model.
  * Keeps Model focused on instance behavior.
+ *
+ * Supports type-safe scopes via the `scoped()` method.
  */
 
 import { Builder } from '../Builder'
 import { Collection } from '../support/Collection'
 import type { ComparisonOperator } from '../types'
 import type { Model, ModelAttributesOf, ModelConstructor } from '../Model'
+import type { ScopeFunction, ScopeRegistry } from '../contracts/ScopeContract'
 
 export class QueryProxy<T extends Model = Model> {
   private readonly modelClass: ModelConstructor<T>
@@ -105,12 +108,64 @@ export class QueryProxy<T extends Model = Model> {
     return builder
   }
 
+  /**
+   * Apply a named scope using the scopes registry (type-safe).
+   *
+   * @example
+   * ```typescript
+   * // In Model:
+   * protected scopes = {
+   *   active: (query) => query.where('active', true),
+   *   withRole: (query, role: string) => query.where('role', role),
+   * }
+   *
+   * // Usage:
+   * User.queryProxy().scoped('active').get()
+   * User.queryProxy().scoped('withRole', 'admin').get()
+   * ```
+   */
+  scoped(name: string, ...args: unknown[]): Builder<T> {
+    const query = this.query()
+
+    // Try registry-based scopes first
+    const proto = this.modelClass.prototype as { scopes?: ScopeRegistry<Builder<T>> }
+    const scopes = proto.scopes
+
+    if (scopes && typeof scopes[name] === 'function') {
+      const scopeFn = scopes[name] as ScopeFunction<Builder<T>, unknown[]>
+      const result = scopeFn(query, ...args)
+      return result instanceof Builder ? result : query
+    }
+
+    // Fallback to method-based scope
+    return this.scope(name, ...args)
+  }
+
+  /**
+   * Apply a named scope (string-based, for backwards compatibility).
+   *
+   * Prefer `scoped()` for type-safe scope calls.
+   *
+   * @deprecated Use `scoped()` for type-safe scope calls
+   */
   scope(name: string, ...args: unknown[]): Builder<T> {
     const query = this.query()
-    const methodName = `scope${name.charAt(0).toUpperCase()}${name.slice(1)}`
 
-    const proto = this.modelClass.prototype
-    const scopeMethod = Reflect.get(proto, methodName)
+    // Try registry-based scopes first
+    const proto = this.modelClass.prototype as { scopes?: ScopeRegistry<Builder<T>> }
+    const scopes = proto.scopes
+
+    if (scopes && typeof scopes[name] === 'function') {
+      const scopeFn = scopes[name] as ScopeFunction<Builder<T>, unknown[]>
+      const result = scopeFn(query, ...args)
+      return result instanceof Builder ? result : query
+    }
+
+    // Fallback to method-based scope (scopeXxx pattern)
+    const methodName = `scope${name.charAt(0).toUpperCase()}${name.slice(1)}`
+    const scopeMethod = Reflect.get(proto, methodName) as
+      | ScopeFunction<Builder<T>, unknown[]>
+      | undefined
 
     if (typeof scopeMethod !== 'function') {
       throw new Error(`Scope '${name}' does not exist on ${this.modelClass.name}`)
