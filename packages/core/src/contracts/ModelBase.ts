@@ -66,12 +66,5 @@ export type ModelBaseConstructor = {
   new (attributes?: Record<string, unknown>): ModelBase
 } & ModelBaseStatic
 
-/**
- * Query scope function type
- */
-export type ScopeFunction<TBuilder> = (query: TBuilder, ...args: unknown[]) => TBuilder | void
-
-/**
- * Scope registry type
- */
-export type ScopeRegistry<TBuilder> = Record<string, ScopeFunction<TBuilder>>
+// Re-export scope types from ScopeContract for backwards compatibility
+export type { ScopeFunction, ScopeRegistry } from './ScopeContract'
