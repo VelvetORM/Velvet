@@ -58,6 +58,16 @@ export type { RelationContract } from './contracts/RelationContract'
 export type { HydratableModel, HydratableModelConstructor } from './contracts/HydratableModel'
 export type { RepositoryContract } from './contracts/RepositoryContract'
 export type { QueryExecutorContract } from './contracts/QueryExecutorContract'
+export type {
+  ScopeFunction,
+  ScopeRegistry,
+  TypedScopeRegistry,
+  Scopeable,
+  ScopeableStatic,
+  InferScopes,
+  InferBuilder
+} from './contracts/ScopeContract'
+export { defineScopes } from './contracts/ScopeContract'
 
 // ==========================================
 // CONNECTION & DRIVERS
@@ -107,3 +117,24 @@ export { Collection } from './support/Collection'
 // ==========================================
 
 export * from './exceptions'
+
+// ==========================================
+// TESTING UTILITIES
+// ==========================================
+
+export {
+  MockDriver,
+  MockConnectionResolver,
+  TestHelper,
+  ModelFactory,
+  FactoryRegistry,
+  setConnectionResolver,
+  resetConnectionResolver,
+  getConnectionResolver,
+  resolveConnection,
+  type ConnectionResolverContract,
+  type RecordedQuery,
+  type MockResponse,
+  type FactoryDefinition,
+  type FactoryState
+} from './testing'
