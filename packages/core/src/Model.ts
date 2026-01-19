@@ -22,7 +22,7 @@ import { Repository } from './model/Repository'
 import { RelationStore } from './model/concerns/RelationStore'
 import { EventRegistrar } from './model/concerns/EventRegistrar'
 import type { Attributes, ModelConfiguration } from './contracts/ModelContract'
-import type { ScopeRegistry } from './contracts/ModelBase'
+import type { ScopeRegistry } from './contracts/ScopeContract'
 import type { ModelBaseStatic } from './contracts/ModelBase'
 import type { DatabaseRow, ComparisonOperator } from './types'
 import type { ValidationRules } from './support/InputValidator'
@@ -386,7 +386,46 @@ export abstract class Model<TAttributes extends Attributes = Attributes> {
   }
 
   /**
-   * Apply a named scope
+   * Apply a named scope (type-safe version using scopes registry)
+   *
+   * @example
+   * ```typescript
+   * // Model definition:
+   * class User extends Model<UserAttributes> {
+   *   protected scopes = {
+   *     active: (query) => query.where('active', true),
+   *     withRole: (query, role: string) => query.where('role', role),
+   *   }
+   * }
+   *
+   * // Usage with type inference:
+   * const users = await User.scoped('active').get()
+   * const admins = await User.scoped('withRole', 'admin').get()
+   * ```
+   */
+  static scoped<T extends Model>(
+    this: ModelConstructor<T>,
+    name: string,
+    ...args: unknown[]
+  ): Builder<T> {
+    const query = this.queryProxy().query()
+
+    // Try registry-based scopes first
+    const scopes = Reflect.get(this.prototype, 'scopes') as ScopeRegistry<Builder<T>> | undefined
+    if (scopes && typeof scopes[name] === 'function') {
+      const scopeFn = scopes[name]
+      const result = scopeFn(query, ...args)
+      return result instanceof Builder ? result : query
+    }
+
+    // Fallback to method-based scope
+    return this.queryProxy().scope(name, ...args)
+  }
+
+  /**
+   * Apply a named scope (string-based, for backwards compatibility)
+   *
+   * @deprecated Use `scoped()` for type-safe scope calls
    */
   static scope<T extends Model>(
     this: ModelConstructor<T>,
